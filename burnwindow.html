@@ -821,6 +821,15 @@ body::before {
 }
 .rx-nearby-banner a { color: #2a7a2a; opacity:.75; font-size:11px; margin-left:auto; text-decoration:none; }
 .rx-nearby-banner a:hover { opacity:1; }
+.fire-incident-list { display:none; padding: 4px 16px 6px; font-family:var(--mono); font-size:11px; }
+.fire-incident-list.wf { background: rgba(201,64,48,.06); }
+.fire-incident-list.rx { background: rgba(34,139,34,.06); }
+.fire-incident-row { display:flex; gap:8px; padding: 3px 0; border-bottom: 1px solid rgba(128,128,128,.1); align-items:baseline; }
+.fire-incident-row:last-child { border-bottom: none; }
+.fire-incident-dist { color:var(--muted); min-width:52px; }
+.fire-incident-name a { color:inherit; text-decoration:none; }
+.fire-incident-name a:hover { text-decoration:underline; }
+.fire-incident-acres { color:var(--muted); margin-left:auto; }
 
 /* ═══ RESOURCES SECTION ══════════════════════════════════════════════════ */
 .res-grid {
@@ -3090,26 +3099,53 @@ async function checkNearbyFires(unitIdx, lat, lon){
   const el = document.getElementById('alerts' + unitIdx);
   if(!el) return;
 
+  const listId = 'fireList' + unitIdx;
+  const rxListId = 'rxList' + unitIdx;
+
+  function incidentRows(list, listId){
+    return list.map(f => {
+      const dist = Math.round(f.distKm);
+      const acresTxt = f.acres > 0 ? Math.round(f.acres).toLocaleString() + ' ac' : '';
+      const searchUrl = 'https://www.google.com/maps?q=' + f.lat + ',' + f.lon;
+      return '<div class="fire-incident-row">'
+        + '<span class="fire-incident-dist">~' + dist + ' km</span>'
+        + '<span class="fire-incident-name"><a href="' + searchUrl + '" target="_blank">' + f.name + '</a></span>'
+        + (acresTxt ? '<span class="fire-incident-acres">' + acresTxt + '</span>' : '')
+        + '</div>';
+    }).join('');
+  }
+
   let html = '';
 
   if(wildfires.length){
     const closest = wildfires[0];
     const dist = Math.round(closest.distKm);
-    const acresTxt = closest.acres > 0 ? ' · ' + Math.round(closest.acres).toLocaleString() + ' ac' : '';
-    html += '<div class="fire-nearby-banner">🔥 <strong>'
-      + wildfires.length + ' active wildfire' + (wildfires.length > 1 ? 's' : '') + ' within 80km'
-      + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)' + acresTxt
-      + '<a href="https://app.watchduty.org/" target="_blank">📱 Watch Duty →</a></div>';
+    const toggleTxt = wildfires.length > 1 ? ' <span style="opacity:.6;font-size:10px">▸ show all</span>' : '';
+    html += '<div class="fire-nearby-banner" style="cursor:pointer" onclick="'
+      + 'var l=document.getElementById(\'' + listId + '\');'
+      + 'var t=this.querySelector(\'span\');'
+      + 'if(l.style.display===\'none\'||!l.style.display){l.style.display=\'block\';if(t)t.textContent=\'▾ hide\'}'
+      + 'else{l.style.display=\'none\';if(t)t.textContent=\'▸ show all\'}">'
+      + '🔥 <strong>' + wildfires.length + ' active wildfire' + (wildfires.length > 1 ? 's' : '') + ' within 80km'
+      + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)'
+      + toggleTxt
+      + '<a href="https://app.watchduty.org/" target="_blank" onclick="event.stopPropagation()">📱 Watch Duty →</a></div>'
+      + '<div class="fire-incident-list wf" id="' + listId + '">' + incidentRows(wildfires) + '</div>';
   }
 
   if(rxBurns.length){
     const closest = rxBurns[0];
     const dist = Math.round(closest.distKm);
-    const acresTxt = closest.acres > 0 ? ' · ' + Math.round(closest.acres).toLocaleString() + ' ac' : '';
-    html += '<div class="rx-nearby-banner">🟢 <strong>'
-      + rxBurns.length + ' nearby prescribed burn' + (rxBurns.length > 1 ? 's' : '') + ' within 80km'
-      + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)' + acresTxt
-      + '</div>';
+    const toggleTxt = rxBurns.length > 1 ? ' <span style="opacity:.6;font-size:10px">▸ show all</span>' : '';
+    html += '<div class="rx-nearby-banner" style="cursor:pointer" onclick="'
+      + 'var l=document.getElementById(\'' + rxListId + '\');'
+      + 'var t=this.querySelector(\'span\');'
+      + 'if(l.style.display===\'none\'||!l.style.display){l.style.display=\'block\';if(t)t.textContent=\'▾ hide\'}'
+      + 'else{l.style.display=\'none\';if(t)t.textContent=\'▸ show all\'}">'
+      + '🟢 <strong>' + rxBurns.length + ' nearby prescribed burn' + (rxBurns.length > 1 ? 's' : '') + ' within 80km'
+      + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)'
+      + toggleTxt + '</div>'
+      + '<div class="fire-incident-list rx" id="' + rxListId + '">' + incidentRows(rxBurns) + '</div>';
   }
 
   el.innerHTML = (el.innerHTML || '') + html;
