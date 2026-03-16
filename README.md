@@ -90,8 +90,6 @@ Set the fuel type per unit in the unit editor. Optionally add slope (%) and gras
 | Weather alerts | [NWS / weather.gov](https://www.weather.gov) | Public domain |
 | Maps | [Leaflet](https://leafletjs.com) + OpenStreetMap | BSD / ODbL |
 
-> If you plan to use BurnWindow commercially, review the Open-Meteo and AirNow terms of service and obtain appropriate licenses.
-
 ---
 
 ## Contributing
@@ -102,6 +100,6 @@ Pull requests are welcome. This is a single-file app — all HTML, CSS, and JS l
 
 ## License
 
-GNU General Public License v3.0 — see [LICENSE](LICENSE).
+BurnWindow is free software, released under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
 
-Derivatives must remain open source under the same license.
+You are free to use, study, modify, and distribute BurnWindow. Any derivative work must also be released under the GPL v3 and remain open source. BurnWindow may not be used as the basis for proprietary or closed-source software.
