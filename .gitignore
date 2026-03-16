@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Scratch / local dev copies
+*-dev.html
+*-test.html
+*-local.html
+
+# Secrets (never commit API keys)
+.env
+secrets.json
