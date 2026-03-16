@@ -455,13 +455,13 @@ body::before {
 
 /* ═══ ADD UNIT ════════════════════════════════════════════════════════════ */
 .add-unit {
-  background: var(--panel); border: 1px dashed var(--border2); border-radius: 3px;
+  background: rgba(212,120,14,.06); border: 2px dashed var(--amber); border-radius: 3px;
   display: flex; align-items: center; justify-content: center;
   min-height: 100px; cursor: pointer; transition: all .2s;
-  font-family: var(--disp); font-weight: 500; font-size: 15px; letter-spacing: 3px;
-  text-transform: uppercase; color: var(--muted2); gap: 10px;
+  font-family: var(--disp); font-weight: 600; font-size: 15px; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--amber); gap: 10px;
 }
-.add-unit:hover { border-color: var(--amber); color: var(--amber); background: rgba(212,120,14,.04); }
+.add-unit:hover { border-color: var(--amber); color: var(--amber); background: rgba(212,120,14,.12); }
 
 /* ═══ MODAL ══════════════════════════════════════════════════════════════ */
 .mo {
@@ -1692,19 +1692,10 @@ const wxEmoji=c=>{if(c==0)return'☀️';if(c<=2)return'🌤️';if(c<=3)return'
 let editIdx=-1;
 let units=JSON.parse(localStorage.getItem('bw_units')||'null')||[
   {
-    name:'Karner Blue Nature Sanctuary',
-    lat:43.4297328, lon:-85.742547,
-    acres:95, lastBurn:'2023-04-12',
-    habitat:'Oak-pine barrens / dry sand prairie — KBB active colony',
-    rx:{rhMin:30,rhMax:50,windMin:5,windMax:12,tempMin:40,precipMax:10,dirs:['N','NE','S','SW','W','NW']},
-    dirOverride:null
-  },
-  {
-    name:'Newaygo Prairie Sanctuary',
-    lat:43.4489384, lon:-85.7225948,
-    acres:110, lastBurn:'2024-10-05',
-    habitat:'Oak-pine barrens / prairie — 2 units: 30ac N of 56th, 80ac S',
-    rx:{rhMin:25,rhMax:55,windMin:5,windMax:15,tempMin:32,precipMax:10,dirs:['N','NE','S','SW','W','NW']},
+    name:'Galveston Bay — Fire & RX Test',
+    lat:29.623611, lon:-94.561111,
+    acres:null, lastBurn:null,
+    habitat:'Test unit — Gulf Coast area with active NIFC wildfire and prescribed burn (RX) detections nearby. Use to verify nearby fire banners.',
     dirOverride:null
   },
   {
