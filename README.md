@@ -30,6 +30,26 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 
 ---
 
+## Get Your API Keys (5 minutes)
+
+BurnWindow works without any keys, but the best data comes from two free APIs. Get both before your first burn.
+
+**1. Synoptic Data — live RAWS weather station observations**
+1. Go to [synopticdata.com](https://synopticdata.com) → **Sign Up** (free)
+2. After confirming your email, go to your account → **API Tokens** → create a token
+3. In BurnWindow, open the **⚙ Synoptic / RAWS** panel at the bottom of the page and paste your token
+
+This unlocks live FFMC readings from the nearest Remote Automated Weather Station (RAWS) to each of your burn units — real observed data instead of model output.
+
+**2. AirNow — air quality index (AQI)**
+1. Go to [docs.airnowapi.org](https://docs.airnowapi.org) → **Register**
+2. Check your email for your API key (arrives immediately)
+3. In BurnWindow, open the **AQI Settings** panel and paste your key
+
+This adds current AQI to each unit card — important for smoke management and public health compliance on burn days.
+
+---
+
 ## Quick Start
 
 1. Download `burnwindow.html`
@@ -39,19 +59,6 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 5. The dashboard fetches weather and computes FWI/FBP automatically
 
 No build step. No server. No dependencies to install. All state is stored in `localStorage`.
-
----
-
-## Optional API Keys
-
-BurnWindow works out of the box without any API keys. Two integrations require free keys for full functionality:
-
-| Feature | Provider | How to get a key |
-|---|---|---|
-| **RAWS / live FFMC** | Synoptic Data | [synopticdata.com](https://synopticdata.com) — free tier available |
-| **AQI** | AirNow / EPA | [docs.airnowapi.org](https://docs.airnowapi.org) — free, no credit card |
-
-Enter your Synoptic token in the **⚙ Synoptic / RAWS** panel at the bottom of the page. AirNow key goes in the **AQI Settings** panel.
 
 ---
 
