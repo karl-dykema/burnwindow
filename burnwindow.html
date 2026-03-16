@@ -814,6 +814,13 @@ body::before {
 }
 .fire-nearby-banner a { color: var(--out); opacity:.75; font-size:11px; margin-left:auto; text-decoration:none; }
 .fire-nearby-banner a:hover { opacity:1; }
+.rx-nearby-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 16px; font-family: var(--mono); font-size: 12px;
+  background: rgba(34,139,34,.1); border-bottom: 1px solid rgba(34,139,34,.25); color: #2a7a2a;
+}
+.rx-nearby-banner a { color: #2a7a2a; opacity:.75; font-size:11px; margin-left:auto; text-decoration:none; }
+.rx-nearby-banner a:hover { opacity:1; }
 
 /* ═══ RESOURCES SECTION ══════════════════════════════════════════════════ */
 .res-grid {
@@ -1000,6 +1007,8 @@ body::before {
   .alert-banner.redflag { background: rgba(138,26,26,.1) !important; color: #8a1a1a !important; }
   .fire-nearby-banner { font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .fire-nearby-banner a { display: none !important; }
+  .rx-nearby-banner { font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rx-nearby-banner a { display: none !important; }
 
   /* ── Forecast strip ── */
   .fc-section { padding: 5px 10px 8px !important; }
@@ -1820,7 +1829,7 @@ async function fetchWeather(lat,lon){
     `&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,precipitation_probability,`+
     `boundary_layer_height,wind_speed_80m`+ // pressure-level vars removed (Haines dropped)
     `&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_direction_10m_dominant,precipitation_sum,`+
-    `precipitation_probability_max,relative_humidity_2m_mean,weather_code`+
+    `precipitation_probability_max,relative_humidity_2m_mean,relative_humidity_2m_min,weather_code`+
     `&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7&past_days=60`;
   const r=await fetch(url);if(!r.ok)throw new Error(`Weather ${r.status}`);
   const d=await r.json();cset(k,d);return d;
@@ -2260,7 +2269,9 @@ function _walkChain(D, startFFMC, startDMC, startDC, stored, key, today){
     if(stored && dt <= stored.date) continue; // already processed
     if(dt > yesterdayStr) break;              // stop before today's forecast day
     const tC      = ((D.temperature_2m_max?.[i] ?? 60) - 32) * 5 / 9;
-    const rh      = D.relative_humidity_2m_mean?.[i] ?? 60;
+    // Van Wagner (1987) specifies noon RH; daily min RH is the closest proxy
+    // (occurs near afternoon temp peak). Fall back to mean if min unavailable.
+    const rh      = D.relative_humidity_2m_min?.[i] ?? D.relative_humidity_2m_mean?.[i] ?? 60;
     const windKmh = (D.wind_speed_10m_max?.[i] ?? 8) * 1.60934;
     const precipMm= (D.precipitation_sum?.[i] ?? 0) * 25.4; // inches → mm
     const month   = new Date(dt + 'T12:00:00').getMonth() + 1;
@@ -2322,6 +2333,26 @@ function buiClass(v){
   if(v < 40)  return { cls:'fwi-moderate', label:'Mod' };
   if(v < 70)  return { cls:'fwi-high',     label:'High' };
   if(v < 100) return { cls:'fwi-vhigh',    label:'V.High' };
+  return             { cls:'fwi-extreme',  label:'Extreme' };
+}
+
+// dmcClass — colour label for Duff Moisture Code
+// Thresholds per Canadian Forest Service (Van Wagner 1987)
+function dmcClass(v){
+  if(v < 20)  return { cls:'fwi-low',     label:'Low' };
+  if(v < 40)  return { cls:'fwi-moderate', label:'Mod' };
+  if(v < 60)  return { cls:'fwi-high',     label:'High' };
+  if(v < 85)  return { cls:'fwi-vhigh',    label:'V.High' };
+  return             { cls:'fwi-extreme',  label:'Extreme' };
+}
+
+// dcClass — colour label for Drought Code
+// Thresholds per Canadian Forest Service (Van Wagner 1987)
+function dcClass(v){
+  if(v < 80)  return { cls:'fwi-low',     label:'Low' };
+  if(v < 190) return { cls:'fwi-moderate', label:'Mod' };
+  if(v < 300) return { cls:'fwi-high',     label:'High' };
+  if(v < 425) return { cls:'fwi-vhigh',    label:'V.High' };
   return             { cls:'fwi-extreme',  label:'Extreme' };
 }
 
@@ -2597,12 +2628,13 @@ function getNoonValues(wx){
     if(times[i]===today+'T12:00') {idx=i;break;}
   }
   if(idx===null) idx=times.findIndex(t=>t.startsWith(today)) || 0;
-  return{
+  const vals={
     tC:fahrenheitToCelsius(wx.hourly.temperature_2m[idx]||15),
     rh:wx.hourly.relative_humidity_2m[idx]||50,
     windKmh:mphToKmh(wx.hourly.wind_speed_10m[idx]||0),
     precipMm:0  // hourly precip prob not mm — use 0 for daily without rain
   };
+  return vals;
 }
 
 // ═══ GLOBAL RX OVERRIDE TRACKING ════════════════════════════════════════
@@ -2788,7 +2820,8 @@ function selectForecastDay(unitIdx, fi){
         const dayLabel=fi===0?'today':dn[new Date(dayDate+'T12:00:00').getDay()];
 
         fuelsEl.innerHTML=
-          '<div class="fuels-row">'
+          '<div style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;padding:4px 18px 0;">Dead Fuel Moisture (NFDRS) · Drought</div>'
+          +'<div class="fuels-row">'
           +'<div class="fuels-cell '+fm1Cls.cls+'" title="1-hr FM for '+dayLabel+' noon conditions (equilibrium from T/RH)">'
           +'<span class="fuels-lbl">1-hr</span><span class="fuels-val">'+fcFM.fm1+'%</span><span class="fuels-cls">'+fm1Cls.lbl+'</span></div>'
           +'<div class="fuels-cell '+fm10Cls.cls+'" title="10-hr FM for '+dayLabel+' noon conditions">'
@@ -2949,7 +2982,7 @@ const NIFC_RADIUS_KM = 80;          // alert radius — 80km ≈ 50 miles
 // Falls back to the old attr_ field schema if the new schema returns no hits.
 const NIFC_BASE =
   'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/' +
-  'WFIGS_Interagency_Incident_Locations_Current/FeatureServer/0/query';
+  'WFIGS_Incident_Locations_Current/FeatureServer/0/query';
 
 // buildNifcUrl — constructs a geographically filtered ArcGIS query URL.
 // bbox = { minLon, minLat, maxLon, maxLat } in WGS84 decimal degrees.
@@ -2958,47 +2991,37 @@ function buildNifcUrl(bbox, useOldSchema){
   const fields = useOldSchema
     ? 'attr_IncidentName,attr_IncidentTypeCategory,attr_IncidentSize'
     : 'IncidentName,IncidentTypeCategory,IncidentSize';
-  // ArcGIS envelope geometry filter — vastly reduces payload vs where=1=1
-  const geom = encodeURIComponent(JSON.stringify({
-    xmin: bbox.minLon, ymin: bbox.minLat,
-    xmax: bbox.maxLon, ymax: bbox.maxLat,
-    spatialReference: { wkid: 4326 }
-  }));
+  // Fetch all current incidents and filter client-side by distance.
+  // The national active incident list is small (~200-500 records during fire season)
+  // and a server-side geometry filter has proven unreliable across NIFC service updates.
   return NIFC_BASE
     + '?where=1%3D1'
-    + '&geometry=' + geom
-    + '&geometryType=esriGeometryEnvelope'
-    + '&spatialRel=esriSpatialRelIntersects'
-    + '&inSR=4326'
     + '&outFields=' + fields
-    + '&returnGeometry=true&f=geojson&resultRecordCount=200';
+    + '&returnGeometry=true&f=json&resultRecordCount=500';
 }
 
-// computeNifcBbox — bounding box covering all units + NIFC_RADIUS_KM padding
-function computeNifcBbox(){
-  if(!units.length) return null;
-  // 1 degree latitude ≈ 111 km; longitude varies by cos(lat)
-  const padLat = NIFC_RADIUS_KM / 111.0;
-  let minLat=Infinity, maxLat=-Infinity, minLon=Infinity, maxLon=-Infinity;
-  units.forEach(u => {
-    const padLon = NIFC_RADIUS_KM / (111.0 * Math.cos(u.lat * Math.PI/180));
-    minLat = Math.min(minLat, u.lat - padLat);
-    maxLat = Math.max(maxLat, u.lat + padLat);
-    minLon = Math.min(minLon, u.lon - padLon);
-    maxLon = Math.max(maxLon, u.lon + padLon);
-  });
-  return { minLat, maxLat, minLon, maxLon };
-}
 
-// Parse a single GeoJSON feature — handles both old (attr_) and new field schemas
+// Parse a single ArcGIS JSON or GeoJSON feature — handles both response formats
+// and both old (attr_) and new field schemas.
 function parseNIFCFeature(f){
-  const p = f.properties || {};
-  // Support both new (IncidentName) and old (attr_IncidentName) field names
-  const name  = p.IncidentName  || p.attr_IncidentName  || 'Unknown Fire';
-  const type  = p.IncidentTypeCategory || p.attr_IncidentTypeCategory || 'WF';
-  const acres = p.IncidentSize  || p.attr_IncidentSize  || 0;
-  const lon   = f.geometry?.coordinates?.[0];
-  const lat   = f.geometry?.coordinates?.[1];
+  // ArcGIS f=json uses f.attributes + f.geometry.x/y
+  // GeoJSON uses f.properties + f.geometry.coordinates
+  let name, type, acres, lat, lon;
+  if(f.attributes){
+    const a = f.attributes;
+    name  = a.IncidentName  || a.attr_IncidentName  || 'Unknown Fire';
+    type  = a.IncidentTypeCategory || a.attr_IncidentTypeCategory || 'WF';
+    acres = a.IncidentSize  || a.attr_IncidentSize  || 0;
+    lon   = f.geometry?.x;
+    lat   = f.geometry?.y;
+  } else {
+    const p = f.properties || {};
+    name  = p.IncidentName  || p.attr_IncidentName  || 'Unknown Fire';
+    type  = p.IncidentTypeCategory || p.attr_IncidentTypeCategory || 'WF';
+    acres = p.IncidentSize  || p.attr_IncidentSize  || 0;
+    lon   = f.geometry?.coordinates?.[0];
+    lat   = f.geometry?.coordinates?.[1];
+  }
   if(lat == null || lon == null) return null;
   return { name, type, acres, lat, lon };
 }
@@ -3007,12 +3030,10 @@ async function fetchNIFCFires(){
   // Return cache if still fresh
   if(nifc_cache !== null && Date.now() - nifc_ts < NIFC_TTL) return nifc_cache;
 
-  // Build geographic bbox from current units to minimize payload
-  const bbox = computeNifcBbox();
-  if(!bbox){ nifc_cache=[]; return []; }
+  if(!units.length){ nifc_cache=[]; return []; }
   // Try new field schema first, then old attr_ schema as fallback
   for(const useOld of [false, true]){
-    const url = buildNifcUrl(bbox, useOld);
+    const url = buildNifcUrl(null, useOld);
     try{
       const r = await fetch(url, { signal: AbortSignal.timeout(10000) }); // 10s timeout
       if(!r.ok){ nifc_fetchError = `HTTP ${r.status}`; continue; }
@@ -3070,32 +3091,52 @@ async function checkNearbyFires(unitIdx, lat, lon){
     .filter(f => f.distKm < NIFC_RADIUS_KM)
     .sort((a, b) => a.distKm - b.distKm);
 
+  const wildfires = nearby.filter(f => f.type !== 'RX');
+  const rxBurns   = nearby.filter(f => f.type === 'RX');
+
   if(!nearby.length) return; // no fires nearby — leave alerts div empty
 
   const el = document.getElementById('alerts' + unitIdx);
   if(!el) return;
 
-  const closest = nearby[0];
-  const dist = Math.round(closest.distKm);
-  const acresTxt = closest.acres > 0 ? ' · ' + Math.round(closest.acres).toLocaleString() + ' ac' : '';
-  const banner =
-    '<div class="fire-nearby-banner">🔥 <strong>'
-    + nearby.length + ' active fire' + (nearby.length > 1 ? 's' : '') + ' within 80km'
-    + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)' + acresTxt
-    + '<a href="https://app.watchduty.org/" target="_blank">📱 Watch Duty →</a></div>';
+  let html = '';
 
-  el.innerHTML = (el.innerHTML || '') + banner;
+  if(wildfires.length){
+    const closest = wildfires[0];
+    const dist = Math.round(closest.distKm);
+    const acresTxt = closest.acres > 0 ? ' · ' + Math.round(closest.acres).toLocaleString() + ' ac' : '';
+    html += '<div class="fire-nearby-banner">🔥 <strong>'
+      + wildfires.length + ' active wildfire' + (wildfires.length > 1 ? 's' : '') + ' within 80km'
+      + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)' + acresTxt
+      + '<a href="https://app.watchduty.org/" target="_blank">📱 Watch Duty →</a></div>';
+  }
 
-  // Also update the global "fires detected nearby" banner above the map
-  const pBanner = document.getElementById('fireProximityBanner');
-  const pDetail = document.getElementById('fireProximityDetail');
-  if(pBanner && pDetail){
-    pBanner.style.display = 'block';
-    const unitName = units[unitIdx]?.name || 'Unit ' + unitIdx;
-    const existing = pDetail.textContent;
-    pDetail.textContent = existing
-      ? existing + '; ' + unitName + ' — ' + closest.name + ' ~' + dist + 'km'
-      : unitName + ' — ' + closest.name + ' ~' + dist + 'km';
+  if(rxBurns.length){
+    const closest = rxBurns[0];
+    const dist = Math.round(closest.distKm);
+    const acresTxt = closest.acres > 0 ? ' · ' + Math.round(closest.acres).toLocaleString() + ' ac' : '';
+    html += '<div class="rx-nearby-banner">🟢 <strong>'
+      + rxBurns.length + ' nearby prescribed burn' + (rxBurns.length > 1 ? 's' : '') + ' within 80km'
+      + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)' + acresTxt
+      + '</div>';
+  }
+
+  el.innerHTML = (el.innerHTML || '') + html;
+
+  // Also update the global "fires detected nearby" banner above the map (wildfires only)
+  if(wildfires.length){
+    const closest = wildfires[0];
+    const dist = Math.round(closest.distKm);
+    const pBanner = document.getElementById('fireProximityBanner');
+    const pDetail = document.getElementById('fireProximityDetail');
+    if(pBanner && pDetail){
+      pBanner.style.display = 'block';
+      const unitName = units[unitIdx]?.name || 'Unit ' + unitIdx;
+      const existing = pDetail.textContent;
+      pDetail.textContent = existing
+        ? existing + '; ' + unitName + ' — ' + closest.name + ' ~' + dist + 'km'
+        : unitName + ' — ' + closest.name + ' ~' + dist + 'km';
+    }
   }
 }
 
@@ -3672,7 +3713,7 @@ async function fetchUnitAQI(unitIdx, lat, lon){
       + `&distance=100`
       + `&API_KEY=${encodeURIComponent(key)}`;
 
-    const obsResp = await fetch(obsUrl);
+    const obsResp = await fetch(obsUrl, { signal: AbortSignal.timeout(10000) });
     if(!obsResp.ok) throw new Error('AirNow HTTP ' + obsResp.status);
     const obsData = await obsResp.json();
 
@@ -3697,7 +3738,7 @@ async function fetchUnitAQI(unitIdx, lat, lon){
       + `&distance=100`
       + `&API_KEY=${encodeURIComponent(key)}`;
 
-    const fcResp = await fetch(fcUrl);
+    const fcResp = await fetch(fcUrl, { signal: AbortSignal.timeout(10000) });
     if(!fcResp.ok) throw new Error('AirNow forecast HTTP ' + fcResp.status);
     const fcData = await fcResp.json();
 
@@ -3718,7 +3759,7 @@ async function fetchUnitAQI(unitIdx, lat, lon){
       + '<a class="aqi-maplink" href="https://fire.airnow.gov/" target="_blank">Fire &amp; Smoke Map ↗</a>';
 
   } catch(e) {
-    const isCors = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('CORS');
+    const isCors = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('CORS') || e.name === 'TimeoutError';
     el.innerHTML = isCors
       ? '<span class="aqi-label">💨 AQI</span><span style="font-size:10px;color:var(--muted)">blocked (CORS/file://)</span>'
         + '<a class="aqi-maplink" href="https://fire.airnow.gov/" target="_blank">Fire &amp; Smoke Map ↗</a>'
@@ -4111,16 +4152,27 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     return;
   }
 
-  // ── compute FWI from real observed values ──────────────────────────────
-  // Load previous FFMC for this station to carry the chain forward.
-  // If no history exists (first run), use startup value of 85.
+  // ── check obs time — FWI system requires noon conditions (Van Wagner 1987) ─
+  // If the latest RAWS obs is outside 10am–4pm, it reflects morning/evening RH
+  // which would badly underestimate FFMC. Fall back to Open-Meteo noon in that case.
   const stId = chosen.STID || chosen.ID || 'UNK';
-  const history = getRawsFfmc0(stId);
+  const _obsFieldTime = chosen.OBSERVATIONS?.['air_temp_value_1'] || chosen.OBSERVATIONS?.['air_temp'];
+  const _obsTimeRaw = _obsFieldTime?.date_time || null;
+  let obsHour = null;
+  if(_obsTimeRaw){ try{ obsHour = new Date(_obsTimeRaw).getHours(); }catch(e){} }
+  const obsNearNoon = obsHour != null && obsHour >= 10 && obsHour <= 16;
 
-  // computeFWI uses ffmc0=85 internally as startup — we override by injecting
-  // yesterday's FFMC via a wrapper that replaces the startup constant.
-  // Since computeFWI() is self-contained, we call it and then apply the
-  // history correction to the moisture content back-calculation.
+  if(!obsNearNoon){
+    // Obs is outside noon window — use Open-Meteo noon model values for FWI
+    renderGrid(
+      openMeteoComps,
+      '📡 ' + (chosen.NAME || stId) + ' · obs not near noon (use for current wx only) — FWI from model',
+      'model'
+    );
+    return;
+  }
+
+  const history = getRawsFfmc0(stId);
   const rawComps = computeFWI(chosenObs.tC, chosenObs.rh, chosenObs.windKmh, chosenObs.precipMm, chainState);
 
   // Persist today's FFMC for this station (short-range carryover)
@@ -4139,7 +4191,6 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
   if(obsTimeRaw){
     try{ obsTimeStr = ' · obs ' + new Date(obsTimeRaw).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch(e){}
   }
-
   const winterNote = missingPrecip
     ? ' · <span title="Precip sensor may be offline in winter — using 0mm" style="color:rgba(200,148,32,.8)">⚠ precip N/A</span>'
     : '';
@@ -4195,6 +4246,8 @@ function buildFwiGridHTML(comps, rxActive, unitIdx, dayLabel){
   const fc2 = ffmcClass(comps.ffmc);
   const ic  = isiClass(comps.isi);
   const bc  = buiClass(comps.bui);
+  const dmc_c = dmcClass(comps.dmc ?? 6);
+  const dc_c  = dcClass(comps.dc ?? 15);
 
   const fwiRxNote  = rxActive.fwiMax  != null ? ' | Rx max: ' + rxActive.fwiMax  : '';
   const ffmcRxNote = rxActive.ffmcMax != null ? ' | Rx max: ' + rxActive.ffmcMax : '';
@@ -4210,23 +4263,28 @@ function buildFwiGridHTML(comps, rxActive, unitIdx, dayLabel){
 
   // Primary 2-badge row: FWI + FFMC
   const toggleId = 'fwiDet' + unitIdx;
-  let html = '<div class="fwi-grid fwi-grid-2">';
+  let html = '<div style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em;margin-bottom:4px;text-transform:uppercase;">Canadian Fire Weather Index</div>';
+  html += '<div class="fwi-grid fwi-grid-2">';
   html += statBox('FWI',  comps.fwi,  fwiOob  ? 'fwi-extreme' : fc.cls,  fc.label,
     'Canadian Fire Weather Index — overall danger combining fuel moisture and fire behavior.' + dl + fwiRxNote, fwiOob);
   html += statBox('FFMC', comps.ffmc, ffmcOob ? 'fwi-extreme' : fc2.cls, fc2.label,
     'Fine Fuel Moisture Code — surface litter/grass moisture. >85 ignition easy, >92 extreme.' + dl + ffmcRxNote, ffmcOob);
   html += '</div>';
 
-  // Details toggle — ISI / BUI shown on expand
+  // Details toggle — ISI / BUI / DMC / DC shown on expand
   const detWarn = (isiOob || buiOob) ? ' <span style="color:var(--out)">⚠</span>' : '';
-  html += '<div class="fwi-details-toggle" onclick="toggleFwiDetails(\'' + toggleId + '\')" title="Show/hide ISI and BUI components">'
-    + '▸ ISI ' + comps.isi + ' · BUI ' + comps.bui + detWarn + '</div>';
+  html += '<div class="fwi-details-toggle" onclick="toggleFwiDetails(\'' + toggleId + '\')" title="Show/hide ISI, BUI, DMC, and DC components">'
+    + '▸ ISI ' + comps.isi + ' · BUI ' + comps.bui + ' · DMC ' + (comps.dmc ?? '—') + ' · DC ' + (comps.dc ?? '—') + detWarn + '</div>';
   html += '<div class="fwi-details-row" id="' + toggleId + '" style="display:none;">';
   html += '<div class="fwi-grid fwi-grid-2">';
   html += statBox('ISI',  comps.isi,  isiOob  ? 'fwi-extreme' : ic.cls,  ic.label,
     'Initial Spread Index — fire spread rate from FFMC + wind. >10 rapid spread.' + dl + isiRxNote, isiOob);
   html += statBox('BUI',  comps.bui,  buiOob  ? 'fwi-extreme' : bc.cls,  bc.label,
     'Buildup Index — available fuel load from DMC+DC drought codes.' + dl + buiRxNote, buiOob);
+  html += statBox('DMC',  comps.dmc ?? '—', dmc_c.cls, dmc_c.label,
+    'Duff Moisture Code — moisture in loosely compacted organic layer (~5 cm). Converges in ~21 days.' + dl, false);
+  html += statBox('DC',   comps.dc  ?? '—', dc_c.cls,  dc_c.label,
+    'Drought Code — deep organic layer moisture / long-term drought. Converges in ~42 days.' + dl, false);
   html += '</div></div>';
 
   return { html, anyOob };
@@ -4239,18 +4297,18 @@ function toggleFwiDetails(id){
   const tog = el.previousElementSibling;
   if(el.style.display === 'none'){
     el.style.display = '';
-    if(tog) tog.textContent = '▾ ISI ' + tog.textContent.replace(/^[▸▾]\s*ISI\s*/,'').replace(/ · BUI.*/,'') + ' · BUI (collapsed above)';
-    // Re-read values from sibling statbox titles
     const vals = el.querySelectorAll('.fwi-stat-val');
-    if(vals.length >= 2 && tog){
-      tog.innerHTML = '▾ ISI ' + vals[0].textContent + ' · BUI ' + vals[1].textContent;
+    if(vals.length >= 4 && tog){
+      tog.innerHTML = '▾ ISI ' + vals[0].textContent + ' · BUI ' + vals[1].textContent
+        + ' · DMC ' + vals[2].textContent + ' · DC ' + vals[3].textContent;
     }
   } else {
     el.style.display = 'none';
     if(tog){
       const vals = el.querySelectorAll('.fwi-stat-val');
-      if(vals.length >= 2){
-        tog.innerHTML = '▸ ISI ' + vals[0].textContent + ' · BUI ' + vals[1].textContent;
+      if(vals.length >= 4){
+        tog.innerHTML = '▸ ISI ' + vals[0].textContent + ' · BUI ' + vals[1].textContent
+          + ' · DMC ' + vals[2].textContent + ' · DC ' + vals[3].textContent;
       }
     }
   }
@@ -4432,7 +4490,8 @@ function refreshUnitRx(idx){
     if(fuelsEl){
       const fwiGood = !(rxActive.fwiMax&&curFwiComps.fwi>rxActive.fwiMax)&&!(rxActive.ffmcMax&&curFwiComps.ffmc>rxActive.ffmcMax);
       fuelsEl.innerHTML =
-        '<div class="fuels-row">'
+        '<div style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;padding:4px 18px 0;">Dead Fuel Moisture (NFDRS) · Drought</div>'
+        + '<div class="fuels-row">'
         // 1hr FM
         + '<div class="fuels-cell ' + fm1Cls.cls + '" title="1-hr Fuel Moisture — dead fine fuels (grass, pine needles). Responds within 1 hour to RH/temp changes.">'
         + '<span class="fuels-lbl">1-hr</span><span class="fuels-val">' + curFM.fm1 + '%</span><span class="fuels-cls">' + fm1Cls.lbl + '</span></div>'
@@ -4732,7 +4791,8 @@ function renderUnits(){
         const fuelsEl=document.getElementById('fuels'+i);
         if(fuelsEl){
           fuelsEl.innerHTML=
-            '<div class="fuels-row">'
+            '<div style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;padding:4px 18px 0;">Dead Fuel Moisture (NFDRS) · Drought</div>'
+            +'<div class="fuels-row">'
             +'<div class="fuels-cell '+fm1Cls.cls+'" title="1-hr Fuel Moisture — dead fine fuels (grass, pine needles). Responds within 1 hour to T/RH.">'
             +'<span class="fuels-lbl">1-hr</span><span class="fuels-val">'+curFM.fm1+'%</span><span class="fuels-cls">'+fm1Cls.lbl+'</span></div>'
             +'<div class="fuels-cell '+fm10Cls.cls+'" title="10-hr Fuel Moisture — small woody debris ≤0.25 inch. Lags ~10 hours behind conditions.">'

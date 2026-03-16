@@ -12,14 +12,14 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 - **Multi-unit management** — track multiple burn units with name, coordinates, acreage, and last burn date
 - **Per-unit burn prescriptions** — RH, wind speed/direction, temperature, precip probability, gust limits, FWI component maxima
 - **Hourly 24-cell burn window** — in / marginal / out status for every hour of the day
-- **Canadian FWI System** — FFMC, DMC, DC, ISI, BUI, FWI computed from a 60-day historical weather chain (Van Wagner 1987)
+- **Canadian FWI System** — FFMC, DMC, DC, ISI, BUI, FWI computed from a 60-day historical weather chain (Van Wagner 1987); FWI chain uses daily minimum RH to better approximate noon conditions
 - **CFFDRS FBP System** — fuel-type-based fire behavior prediction: Rate of Spread (m/min), Head Fire Intensity (kW/m), Crown Fraction Burned, fire type (surface / intermittent / active crown)
 - **KBDI** — Keetch-Byram Drought Index stepped daily from forecast precipitation and temperature
-- **Dead fuel moisture** — 1-hr, 10-hr, 100-hr equilibrium moisture content
+- **Dead fuel moisture (NFDRS)** — 1-hr, 10-hr, 100-hr equilibrium moisture content
 - **Ventilation Index** — boundary layer height × transport wind
 - **AQI** — Air quality via AirNow API (requires free key)
-- **Nearby active fires** — NIFC incident detection with distance and acreage
-- **RAWS integration** — live FFMC from nearest Remote Automated Weather Station (requires Synoptic Data token)
+- **Nearby active fires** — NIFC incident detection with distance and acreage; wildfires and nearby prescribed burns (RX) shown separately
+- **RAWS integration** — live FFMC from nearest Remote Automated Weather Station (requires Synoptic Data token); observations outside the 10 AM–4 PM window automatically fall back to Open-Meteo model values to maintain FWI accuracy
 - **5-day forecast** — clickable forecast strip updates all FWI and FBP outputs for each forecast day
 - **Go/No-Go modal** — structured decision checklist with burn log
 - **CSV import/export** — bulk unit management
