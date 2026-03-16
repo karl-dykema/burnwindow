@@ -1,5 +1,5 @@
 # 🔥 BurnWindow
-**Prescription Fire Decision Dashboard** · v1.0.0
+**Prescribed Fire Decision Dashboard** · v1.0.0
 
 BurnWindow is an open-source, browser-based go/no-go decision support tool for prescribed fire managers. It integrates real-time weather forecasts, the Canadian Fire Weather Index (FWI) system, CFFDRS Fire Behavior Prediction (FBP), drought indices, air quality, and nearby active fire detection into a single field-ready dashboard — with no server, no login, and no installation required.
 
@@ -96,6 +96,28 @@ Set the fuel type per unit in the unit editor. Optionally add slope (%) and gras
 | Active fire incidents | [NIFC](https://www.nifc.gov) | Public domain |
 | Weather alerts | [NWS / weather.gov](https://www.weather.gov) | Public domain |
 | Maps | [Leaflet](https://leafletjs.com) + OpenStreetMap | BSD / ODbL |
+
+---
+
+## Privacy & Anonymous Usage Stats
+
+BurnWindow collects anonymous usage data to help improve the app. No personal information, burn unit data, or location coordinates are ever transmitted.
+
+| Service | Purpose | Data collected |
+|---|---|---|
+| [GoatCounter](https://www.goatcounter.com) | Usage counts | Page hit, approximate country (from IP), browser, OS — no cookies, no cross-site tracking |
+| [Sentry](https://sentry.io) | Error reporting | JavaScript error message and stack trace, browser, OS — no user content |
+
+### Opting out
+
+To disable all tracking, open `burnwindow.html` in a text editor and remove these two lines from the `<head>`:
+
+```html
+<script>window.goatcounter = ...</script>
+<script async src="https://gc.zgo.at/count.js" ...></script>
+```
+
+And clear the `SENTRY_DSN` value in the `ERROR TRACKING` section near the bottom of the `<script>` block.
 
 ---
 

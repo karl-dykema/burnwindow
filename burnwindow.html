@@ -5,10 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="BurnWindow — open-source prescribed fire go/no-go decision dashboard. Weather, FWI system, fire behavior prediction (FBP), KBDI, AQI, and burn window visualization for land managers.">
 <meta name="author" content="BurnWindow Contributors">
-<meta property="og:title" content="BurnWindow — Prescription Fire Dashboard">
+<meta property="og:title" content="BurnWindow — Prescribed Fire Dashboard">
 <meta property="og:description" content="Open-source go/no-go decision support for prescribed fire managers. Integrates weather forecasts, Canadian FWI system, CFFDRS FBP fire behavior prediction, KBDI, AQI, and RAWS observations.">
 <meta property="og:type" content="website">
-<title>BurnWindow — Prescription Fire Dashboard</title>
+<title>BurnWindow — Prescribed Fire Dashboard</title>
+<!-- Sentry error tracking — sign up free at https://sentry.io, replace YOUR_SENTRY_DSN below -->
+<!-- Remove or leave DSN blank to disable error reporting -->
+<script src="https://browser.sentry-cdn.com/8.38.0/bundle.min.js" crossorigin="anonymous"></script>
+<!-- GoatCounter usage analytics — https://burnwindow.goatcounter.com -->
+<script>window.goatcounter = { path: '/burnwindow', title: 'BurnWindow', allow_local: true };</script>
+<script async src="https://gc.zgo.at/count.js" data-goatcounter="https://burnwindow.goatcounter.com/count"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1040,7 +1046,7 @@ body::before {
 
   /* ── Print footer watermark ── */
   .app::after {
-    content: 'BurnWindow — Prescription Fire Dashboard · Printed ' attr(data-printdate) ' · Data: Open-Meteo / NIFC / NWS';
+    content: 'BurnWindow — Prescribed Fire Dashboard · Printed ' attr(data-printdate) ' · Data: Open-Meteo / NIFC / NWS';
     display: block;
     margin-top: 20px;
     padding-top: 8px;
@@ -1233,7 +1239,7 @@ body.mobile-view .topbar-right > .tbar-btn:not(#viewToggleBtn):not(#themeToggleB
 <div class="about-overlay" id="aboutOverlay" onclick="if(event.target===this)closeAbout()">
   <div class="about-box">
     <div class="about-title">🔥 BurnWindow</div>
-    <div class="about-sub">v1.0.0 · Prescription Fire Decision Dashboard · Open Source (GPL v3)</div>
+    <div class="about-sub">v1.0.0 · Prescribed Fire Decision Dashboard · Open Source (GPL v3)</div>
 
     <div class="about-section">
       BurnWindow is an open-source, browser-based go/no-go decision support tool for prescribed fire managers.
@@ -5740,6 +5746,21 @@ renderUnits();
 detectStateAndRenderLinks();
 // Update map markers after units render (slight delay for status colors)
 setTimeout(updateMapUnits, 2500);
+
+// ═══ ERROR TRACKING (SENTRY) ═════════════════════════════════════════════
+// GoatCounter usage analytics are loaded via <script> tag in <head>.
+// Error tracking via Sentry — replace YOUR_SENTRY_DSN with your project DSN from sentry.io
+// Set to '' or leave as-is to disable.
+(function() {
+  var SENTRY_DSN = 'https://fb1db06d726643b7ecfe95db35defb6f@o4511051469946880.ingest.us.sentry.io/4511051474534400';
+  if (!SENTRY_DSN || SENTRY_DSN === 'YOUR_SENTRY_DSN') return;
+  if (typeof Sentry === 'undefined') return;
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    release: 'burnwindow@1.0.0',
+    environment: 'production'
+  });
+})();
 </script>
 
 <!-- GO/NO-GO MODAL -->
