@@ -1648,6 +1648,12 @@ body.mobile-view .topbar-right > .tbar-btn:not(#viewToggleBtn):not(#themeToggleB
           <div class="dir-chip" data-d="NW" onclick="toggleUnitDir(this)">NW</div>
         </div>
       </div>
+      <div style="margin-top:4px;margin-bottom:14px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;" title="When checked, snow cover on the ground will not downgrade this unit's verdict. Use for units where burning through patchy or shallow snow is part of the plan.">
+          <input type="checkbox" id="uBurnOkWithSnow" class="gng-cb">
+          <span style="font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Burns permitted with snow on ground</span>
+        </label>
+      </div>
     </div><!-- /tabPaneSingle -->
 
     <!-- ══════════════════════════════════════════════════════════════════════
@@ -2025,15 +2031,20 @@ function evalFDay(daily,fi,rx,dirOverride){
 
 function buildRxSummary(unit){
   const rx=unit.rx;
-  if(!rx) return '<span style="color:var(--muted2);font-size:10px">Using global prescription</span>';
+  const snowOk=unit.burnOkWithSnow;
+  if(!rx&&!snowOk) return '<span style="color:var(--muted2);font-size:10px">Using global prescription</span>';
   const parts=[];
-  if(rx.rhMin!=null||rx.rhMax!=null) parts.push(`RH ${rx.rhMin??'—'}–${rx.rhMax??'—'}%`);
-  if(rx.windMin!=null||rx.windMax!=null) parts.push(`Wind ${rx.windMin??'—'}–${rx.windMax??'—'} mph`);
-  if(rx.tempMin!=null) parts.push(`Temp >${rx.tempMin}°F`);
-  if(rx.precipMax!=null) parts.push(`Precip <${rx.precipMax}%`);
-  if(rx.dirs&&rx.dirs.length) parts.push(rx.dirs.join(' '));
-  if(!parts.length) return '<span style="color:var(--muted2);font-size:10px">Using global prescription</span>';
-  return parts.map(p=>`<span class="uc-rx-pill">${p}</span>`).join('');
+  if(rx){
+    if(rx.rhMin!=null||rx.rhMax!=null) parts.push(`RH ${rx.rhMin??'—'}–${rx.rhMax??'—'}%`);
+    if(rx.windMin!=null||rx.windMax!=null) parts.push(`Wind ${rx.windMin??'—'}–${rx.windMax??'—'} mph`);
+    if(rx.tempMin!=null) parts.push(`Temp >${rx.tempMin}°F`);
+    if(rx.precipMax!=null) parts.push(`Precip <${rx.precipMax}%`);
+    if(rx.dirs&&rx.dirs.length) parts.push(rx.dirs.join(' '));
+  }
+  if(!parts.length&&!snowOk) return '<span style="color:var(--muted2);font-size:10px">Using global prescription</span>';
+  let html=parts.map(p=>`<span class="uc-rx-pill">${p}</span>`).join('');
+  if(snowOk) html+=`<span class="uc-rx-pill" style="color:#5bb8f5;border-color:rgba(91,184,245,.35)">❄ snow OK</span>`;
+  return html;
 }
 
 
@@ -4474,14 +4485,15 @@ function refreshUnitRx(idx){
   const _snowTagRx=document.getElementById('snowTag'+idx);
   if(_snowTagRx) _snowTagRx.innerHTML=buildSnowTagHtml(_snowInfoRx,true);
 
-  // Verdict badge (snow cover downgrades IN → MARGINAL)
-  const effectiveVerdictRx=_snowRx>0&&verdict==='in'?'marginal':verdict;
+  // Verdict badge (snow cover downgrades IN → MARGINAL unless unit permits snow)
+  const _snowDowngradeRx=_snowRx>0&&verdict==='in'&&!unit.burnOkWithSnow;
+  const effectiveVerdictRx=_snowDowngradeRx?'marginal':verdict;
   if(acc) acc.className = 'unit-accent ' + effectiveVerdictRx;
   const vEl = document.getElementById('v' + idx);
   if(vEl){
     vEl.className = 'verdict ' + effectiveVerdictRx;
     const lbl = {in:'IN PRESCRIPTION', marginal:'MARGINAL', out:'OUT OF RX'};
-    const snowLblRx=_snowRx>0&&verdict==='in'?'MARGINAL — ❄ snow cover':null;
+    const snowLblRx=_snowDowngradeRx?'MARGINAL — ❄ snow cover':null;
     vEl.innerHTML = '<div class="verdict-dot"></div><span>' + (snowLblRx||lbl[effectiveVerdictRx]||effectiveVerdictRx.toUpperCase()) + '</span>';
   }
 
@@ -4757,15 +4769,16 @@ function renderUnits(){
       const snowTagEl=document.getElementById('snowTag'+i);
       if(snowTagEl) snowTagEl.innerHTML=buildSnowTagHtml(_snowInfoLoad,true);
 
-      // Accent + verdict (snow cover downgrades IN → MARGINAL)
-      let effectiveVerdict=snowDepthIn>0&&verdict==='in'?'marginal':verdict;
+      // Accent + verdict (snow cover downgrades IN → MARGINAL unless unit permits snow)
+      const _snowDowngrade=snowDepthIn>0&&verdict==='in'&&!unit.burnOkWithSnow;
+      let effectiveVerdict=_snowDowngrade?'marginal':verdict;
       const acc=document.getElementById('acc'+i);
       if(acc)acc.className=`unit-accent ${effectiveVerdict}`;
       const vEl=document.getElementById('v'+i);
       if(vEl){
         vEl.className=`verdict ${effectiveVerdict}`;
         const lbl={in:'IN PRESCRIPTION',marginal:'MARGINAL',out:'OUT OF RX'};
-        const snowLbl=snowDepthIn>0&&verdict==='in'?'MARGINAL — ❄ snow cover':null;
+        const snowLbl=_snowDowngrade?'MARGINAL — ❄ snow cover':null;
         vEl.innerHTML=`<div class="verdict-dot"></div><span>${snowLbl||lbl[effectiveVerdict]||effectiveVerdict.toUpperCase()}</span>`;
       }
 
@@ -5029,6 +5042,7 @@ function openModal(idx=-1){
   switchModalTab('single');
   document.getElementById('fLastBurn').value='';
   document.querySelectorAll('#unitDirRow .dir-chip').forEach(el=>el.classList.remove('on'));
+  const _snowCbClear=document.getElementById('uBurnOkWithSnow');if(_snowCbClear)_snowCbClear.checked=false;
 
   if(idx>=0){
     const u=units[idx];
@@ -5053,6 +5067,7 @@ function openModal(idx=-1){
     (urx.dirs||[]).forEach(d=>{const el=document.querySelector(`#unitDirRow .dir-chip[data-d="${d}"]`);if(el)el.classList.add('on');});
     // legacy dirOverride compat
     if(!urx.dirs||!urx.dirs.length)(u.dirOverride||[]).forEach(d=>{const el=document.querySelector(`#unitDirRow .dir-chip[data-d="${d}"]`);if(el)el.classList.add('on');});
+    const _snowCb=document.getElementById('uBurnOkWithSnow');if(_snowCb)_snowCb.checked=!!u.burnOkWithSnow;
   } else {
     document.getElementById('modalTitle').textContent='New Burn Unit';
   }
@@ -5375,7 +5390,8 @@ function saveUnit(){
   Object.entries(rxFm).forEach(([id,k])=>{const v=document.getElementById(id)?.value;if(v!==''&&v!=null)unitRx[k]=parseFloat(v);});
   const unitDirs=[...document.querySelectorAll('#unitDirRow .dir-chip.on')].map(el=>el.dataset.d);
   if(unitDirs.length) unitRx.dirs=unitDirs;
-  const u={name,lat,lon,acres,lastBurn,habitat,fuelType,slope,curing,rx:Object.keys(unitRx).length?unitRx:null,dirOverride:null};
+  const burnOkWithSnow=document.getElementById('uBurnOkWithSnow')?.checked||false;
+  const u={name,lat,lon,acres,lastBurn,habitat,fuelType,slope,curing,burnOkWithSnow:burnOkWithSnow||undefined,rx:Object.keys(unitRx).length?unitRx:null,dirOverride:null};
 
   // Detect whether lat/lon changed — if so we need a full re-render with new
   // weather fetch; if only prescription fields changed, use the fast rx-only path
