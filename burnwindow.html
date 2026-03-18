@@ -4704,7 +4704,7 @@ function renderUnits(){
             ${unit.acres?`<span class="uc-tag acres">⬛ ${unit.acres} acres</span>`:''}
             ${unit.lastBurn?`<span class="uc-tag" title="Last recorded burn">🔥 last burn ${formatDate(unit.lastBurn)}<span style="color:var(--muted2);margin-left:5px;font-size:11px">(${burnAge(unit.lastBurn)})</span></span>`:'<span class="uc-tag" style="color:var(--out)">⚠ no burn record</span>'}
             ${unit.habitat?`<span class="uc-tag" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${unit.habitat}</span>`:''}
-            <span id="snowTag${i}"></span>
+            <span id="snowTag${i}" style="flex-basis:100%;display:flex;flex-direction:column;gap:3px;"></span>
           </div>
           <div class="uc-rx-summary" id="rxsum${i}">${buildRxSummary(unit)}</div>
         </div>
