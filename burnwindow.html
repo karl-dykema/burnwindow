@@ -309,6 +309,7 @@ body::before {
   white-space: nowrap;
 }
 .uc-tag.acres { color: var(--amber); border-color: rgba(212,120,14,.3); background: rgba(212,120,14,.06); }
+.uc-tag.snow  { color: #5bb8f5; border-color: rgba(91,184,245,.35); background: rgba(91,184,245,.07); }
 
 /* Verdict badge */
 .verdict {
@@ -1823,12 +1824,12 @@ function cclear(){
 
 // ═══ API CALLS ════════════════════════════════════════════════════════════
 async function fetchWeather(lat,lon){
-  const k=`wx5_${lat}_${lon}`;  // wx5: +past_days=60 for FWI chain, no second fetch
+  const k=`wx6_${lat}_${lon}`;  // wx6: +snow_depth in hourly
   const c=cget(k);if(c)return c;
   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
     `&current=temperature_2m,wind_speed_10m,wind_direction_10m,relative_humidity_2m,precipitation_probability`+
     `&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,precipitation_probability,`+
-    `boundary_layer_height,wind_speed_80m`+ // pressure-level vars removed (Haines dropped)
+    `boundary_layer_height,wind_speed_80m,snow_depth`+ // snow_depth in meters; pressure-level vars removed (Haines dropped)
     `&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_direction_10m_dominant,precipitation_sum,`+
     `precipitation_probability_max,relative_humidity_2m_mean,relative_humidity_2m_min,weather_code`+
     `&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7&past_days=60`;
@@ -1928,6 +1929,25 @@ function evalCurrent(wx, rx, dirOverride, alerts){
 }
 
 // Forecast day verdict
+// Snow WMO codes: 71/73/75 = snowfall, 77 = snow grains, 85/86 = snow showers
+const SNOW_WMO=new Set([71,73,75,77,85,86]);
+
+// Current snow depth in inches from hourly data (Open-Meteo returns meters)
+function getSnowDepthIn(wx){
+  if(!wx.hourly?.snow_depth) return 0;
+  const _n=new Date();
+  const todayStr=`${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}-${String(_n.getDate()).padStart(2,'0')}`;
+  const todayIdx=wx.hourly.time.findIndex(t=>t.startsWith(todayStr));
+  const hIdx=todayIdx>=0?todayIdx+_n.getHours():-1;
+  if(hIdx<0||hIdx>=wx.hourly.snow_depth.length) return 0;
+  return Math.round((wx.hourly.snow_depth[hIdx]||0)*39.3701*10)/10;
+}
+
+// True if day fi or fi-1 has a snow WMO weather code
+function isDaySnow(D,fi){
+  return SNOW_WMO.has(D.weather_code?.[fi])||(fi>0&&SNOW_WMO.has(D.weather_code?.[fi-1]));
+}
+
 function evalFDay(daily,fi,rx,dirOverride){
   const dirs=dirOverride&&dirOverride.length>0?dirOverride:rx.dirs;
   const wind=daily.wind_speed_10m_max[fi]||0;
@@ -2748,6 +2768,17 @@ function selectForecastDay(unitIdx, fi){
     if(inHours===0) rxws.innerHTML=`<span class="rxws-label">Window:</span><span class="rxws-none">No hours in prescription</span>`;
     else if(inHours>=20) rxws.innerHTML=`<span class="rxws-label">Window:</span><span class="rxws-all">All day in prescription (${inHours}h)</span>`;
     else rxws.innerHTML=`<span class="rxws-label">Window:</span><span class="rxws-window">${windowText} (${inHours}h)</span>`;
+  }
+
+  // Update snow forecast tag for selected day
+  const snowTagSel=document.getElementById('snowTag'+unitIdx);
+  if(snowTagSel){
+    const depthIn=getSnowDepthIn(wx);
+    const daySnow=isDaySnow(D,fi);
+    let sh='';
+    if(depthIn>0) sh+=`<span class="uc-tag snow" title="Current snow depth on ground">❄ ${depthIn}" snow cover</span>`;
+    if(daySnow) sh+=`<span class="uc-tag snow" title="Snow in forecast for this day or the day before">❄ snow in forecast</span>`;
+    snowTagSel.innerHTML=sh;
   }
 
   // Update conditions grid with noon or best available hour for that day
@@ -4382,12 +4413,28 @@ function refreshUnitRx(idx){
   const acc = document.getElementById('acc' + idx);
   if(acc) acc.className = 'unit-accent ' + verdict;
 
-  // Verdict badge
+  // Snow cover
+  const _snowRx=getSnowDepthIn(wx);
+  const _nRx=new Date();const _todayRx=`${_nRx.getFullYear()}-${String(_nRx.getMonth()+1).padStart(2,'0')}-${String(_nRx.getDate()).padStart(2,'0')}`;
+  const _startRx=Math.max(0,(wx.daily?.time||[]).indexOf(_todayRx));
+  const _snowFcRx=isDaySnow(wx.daily,_startRx);
+  const _snowTagRx=document.getElementById('snowTag'+idx);
+  if(_snowTagRx){
+    let sh='';
+    if(_snowRx>0) sh+=`<span class="uc-tag snow" title="Current snow depth on ground">❄ ${_snowRx}" snow cover</span>`;
+    if(_snowFcRx) sh+=`<span class="uc-tag snow" title="Snow in forecast for today or yesterday">❄ snow in forecast</span>`;
+    _snowTagRx.innerHTML=sh;
+  }
+
+  // Verdict badge (snow cover downgrades IN → MARGINAL)
+  const effectiveVerdictRx=_snowRx>0&&verdict==='in'?'marginal':verdict;
+  if(acc) acc.className = 'unit-accent ' + effectiveVerdictRx;
   const vEl = document.getElementById('v' + idx);
   if(vEl){
-    vEl.className = 'verdict ' + verdict;
+    vEl.className = 'verdict ' + effectiveVerdictRx;
     const lbl = {in:'IN PRESCRIPTION', marginal:'MARGINAL', out:'OUT OF RX'};
-    vEl.innerHTML = '<div class="verdict-dot"></div><span>' + (lbl[verdict] || verdict.toUpperCase()) + '</span>';
+    const snowLblRx=_snowRx>0&&verdict==='in'?'MARGINAL — ❄ snow cover':null;
+    vEl.innerHTML = '<div class="verdict-dot"></div><span>' + (snowLblRx||lbl[effectiveVerdictRx]||effectiveVerdictRx.toUpperCase()) + '</span>';
   }
 
   // Hourly bar
@@ -4597,6 +4644,7 @@ function renderUnits(){
             ${unit.acres?`<span class="uc-tag acres">⬛ ${unit.acres} acres</span>`:''}
             ${unit.lastBurn?`<span class="uc-tag" title="Last recorded burn">🔥 last burn ${formatDate(unit.lastBurn)}<span style="color:var(--muted2);margin-left:5px;font-size:11px">(${burnAge(unit.lastBurn)})</span></span>`:'<span class="uc-tag" style="color:var(--out)">⚠ no burn record</span>'}
             ${unit.habitat?`<span class="uc-tag" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${unit.habitat}</span>`:''}
+            <span id="snowTag${i}"></span>
           </div>
           <div class="uc-rx-summary" id="rxsum${i}">${buildRxSummary(unit)}</div>
         </div>
@@ -4653,18 +4701,33 @@ function renderUnits(){
       const cells=buildHourlyBar(wx,rx,null);
       const nowH=new Date().getHours();
 
-      // Accent + verdict
+      // Snow cover
+      const snowDepthIn=getSnowDepthIn(wx);
+      const _nsn=new Date();const _todaySn=`${_nsn.getFullYear()}-${String(_nsn.getMonth()+1).padStart(2,'0')}-${String(_nsn.getDate()).padStart(2,'0')}`;
+      const _startSn=Math.max(0,(wx.daily?.time||[]).indexOf(_todaySn));
+      const snowForecast=isDaySnow(wx.daily,_startSn);
+      const snowTagEl=document.getElementById('snowTag'+i);
+      if(snowTagEl){
+        let sh='';
+        if(snowDepthIn>0) sh+=`<span class="uc-tag snow" title="Current snow depth on ground">❄ ${snowDepthIn}" snow cover</span>`;
+        if(snowForecast) sh+=`<span class="uc-tag snow" title="Snow in forecast for today or yesterday">❄ snow in forecast</span>`;
+        snowTagEl.innerHTML=sh;
+      }
+
+      // Accent + verdict (snow cover downgrades IN → MARGINAL)
+      let effectiveVerdict=snowDepthIn>0&&verdict==='in'?'marginal':verdict;
       const acc=document.getElementById('acc'+i);
-      if(acc)acc.className=`unit-accent ${verdict}`;
+      if(acc)acc.className=`unit-accent ${effectiveVerdict}`;
       const vEl=document.getElementById('v'+i);
       if(vEl){
-        vEl.className=`verdict ${verdict}`;
+        vEl.className=`verdict ${effectiveVerdict}`;
         const lbl={in:'IN PRESCRIPTION',marginal:'MARGINAL',out:'OUT OF RX'};
-        vEl.innerHTML=`<div class="verdict-dot"></div><span>${lbl[verdict]||verdict.toUpperCase()}</span>`;
+        const snowLbl=snowDepthIn>0&&verdict==='in'?'MARGINAL — ❄ snow cover':null;
+        vEl.innerHTML=`<div class="verdict-dot"></div><span>${snowLbl||lbl[effectiveVerdict]||effectiveVerdict.toUpperCase()}</span>`;
       }
 
       // Summary
-      summaries.push({idx:i,name:unit.name,verdict});
+      summaries.push({idx:i,name:unit.name,verdict:effectiveVerdict});
       if(summaries.length===units.length){
         renderSummary(summaries);
         setTimeout(refreshNetworkPanel, 200); // update cache status badges after all loads
