@@ -2699,11 +2699,13 @@ function selectForecastDay(unitIdx, fi){
   const {wx,rx}=stored;
   const D=wx.daily;
   const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const _tn3=new Date();const todayStr3=`${_tn3.getFullYear()}-${String(_tn3.getMonth()+1).padStart(2,'0')}-${String(_tn3.getDate()).padStart(2,'0')}`;
+  const startIdx3=Math.max(0,D.time.indexOf(todayStr3));
 
-  // Highlight selected day
+  // Highlight selected day (fi is absolute index; strip elements are 0-based within the 5-day slice)
   const strip=document.getElementById('fcs'+unitIdx);
   if(strip) strip.querySelectorAll('.fcday').forEach((el,idx)=>{
-    el.classList.toggle('selected', idx===fi);
+    el.classList.toggle('selected', idx===fi-startIdx3);
   });
 
   // Find hourly indices for this day
@@ -2724,7 +2726,7 @@ function selectForecastDay(unitIdx, fi){
   // Update hourly bar
   const hbar=document.getElementById('hbar'+unitIdx);
   const nowH=new Date().getHours();
-  const isToday=fi===0;
+  const isToday=D.time[fi]===todayStr3;
   if(hbar){
     hbar.innerHTML=cells.map((s,h)=>
       `<div class="hcell ${s}${isToday&&h===nowH?' now':''} ${h===12?'noon-mark':''}" title="${fmtH(h)}: ${s}"></div>`
@@ -2734,7 +2736,7 @@ function selectForecastDay(unitIdx, fi){
   // Update section label
   const lbl=document.querySelector('#card'+unitIdx+' .hourly-lbl');
   if(lbl){
-    const dname=fi===0?'Today — ':dn[new Date(dayDate+'T12:00:00').getDay()]+' '+dayDate.slice(5)+' — ';
+    const dname=isToday?'Today — ':dn[new Date(dayDate+'T12:00:00').getDay()]+' '+dayDate.slice(5)+' — ';
     lbl.innerHTML=`<span class="hourly-day-label">${dname}</span>Prescription Window`;
   }
 
@@ -4541,19 +4543,21 @@ function refreshUnitRx(idx){
   if(fcEl && wx.daily){
     const D  = wx.daily;
     const dn = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const today = new Date().toISOString().split('T')[0];
-    const daysHtml = D.time.slice(0,5).map((date, fi) => {
-      const rhV    = D.relative_humidity_2m_mean?.[fi] ?? 50;
-      const wV     = D.wind_speed_10m_max?.[fi] ?? 0;
-      const wdV    = D.wind_direction_10m_dominant?.[fi] ?? 0;
-      const tV     = D.temperature_2m_max?.[fi] ?? 50;
-      const pV     = D.precipitation_probability_max?.[fi] ?? 0;
-      const wc     = D.weather_code?.[fi] ?? 0;
+    const _tn=new Date();const today=`${_tn.getFullYear()}-${String(_tn.getMonth()+1).padStart(2,'0')}-${String(_tn.getDate()).padStart(2,'0')}`;
+    const startIdx=Math.max(0,D.time.indexOf(today));
+    const daysHtml = D.time.slice(startIdx,startIdx+5).map((date, fi) => {
+      const ai=startIdx+fi;
+      const rhV    = D.relative_humidity_2m_mean?.[ai] ?? 50;
+      const wV     = D.wind_speed_10m_max?.[ai] ?? 0;
+      const wdV    = D.wind_direction_10m_dominant?.[ai] ?? 0;
+      const tV     = D.temperature_2m_max?.[ai] ?? 50;
+      const pV     = D.precipitation_probability_max?.[ai] ?? 0;
+      const wc     = D.weather_code?.[ai] ?? 0;
       const s      = evalHour(rhV, wV, null, wdV, tV, pV, rx, null);
       const dname  = date === today ? 'Today' : dn[new Date(date + 'T12:00:00').getDay()];
       const emoji  = wxEmoji(wc);
       return '<div class="fcday ' + s + (fi === 0 ? ' selected' : '') + '" '
-        + 'onclick="selectForecastDay(' + idx + ',' + fi + ')" '
+        + 'onclick="selectForecastDay(' + idx + ',' + ai + ')" '
         + 'title="' + date + '">'
         + '<div class="fcd-name">' + dname + '</div>'
         + '<div class="fcd-icon">' + emoji  + '</div>'
@@ -4851,10 +4855,13 @@ function renderUnits(){
       if(fcEl&&wx.daily){
         const D=wx.daily;
         const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const daysHtml=D.time.slice(0,5).map((dt,fi)=>{
-          const fv=evalFDay(D,fi,rx,null);
+        const _tn2=new Date();const todayStr2=`${_tn2.getFullYear()}-${String(_tn2.getMonth()+1).padStart(2,'0')}-${String(_tn2.getDate()).padStart(2,'0')}`;
+        const startIdx2=Math.max(0,D.time.indexOf(todayStr2));
+        const daysHtml=D.time.slice(startIdx2,startIdx2+5).map((dt,fi)=>{
+          const ai=startIdx2+fi;
+          const fv=evalFDay(D,ai,rx,null);
           const dname=fi===0?'Today':dn[new Date(dt+'T12:00:00').getDay()];
-          return `<button class="fcday ${fv}${fi===0?' today selected':''}" onclick="selectForecastDay(${i},${fi})" title="View ${dname}'s prescription window">
+          return `<button class="fcday ${fv}${fi===0?' today selected':''}" onclick="selectForecastDay(${i},${ai})" title="View ${dname}'s prescription window">
             <div class="fcd-name">${dname}</div>
             <div class="fcd-ico">${wxEmoji(D.weather_code[fi]||0)}</div>
             <div class="fcd-tmp"><b>${Math.round(D.temperature_2m_max[fi]||0)}°</b>/<span>${Math.round(D.temperature_2m_min[fi]||0)}°</span></div>
