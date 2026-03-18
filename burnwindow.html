@@ -4196,7 +4196,7 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     // Obs is outside noon window — use Open-Meteo noon model values for FWI
     renderGrid(
       openMeteoComps,
-      '📡 ' + (chosen.NAME || stId) + ' · obs not near noon (use for current wx only) — FWI from model',
+      '📡 ' + (chosen.NAME || stId) + ' · non-noon obs · reverting to forecast model FWI',
       'model'
     );
     return;
