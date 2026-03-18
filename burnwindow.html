@@ -4982,11 +4982,11 @@ function renderUnits(){
           const dname=fi===0?'Today':dn[new Date(dt+'T12:00:00').getDay()];
           return `<button class="fcday ${fv}${fi===0?' today selected':''}" onclick="selectForecastDay(${i},${ai})" title="View ${dname}'s prescription window">
             <div class="fcd-name">${dname}</div>
-            <div class="fcd-ico">${wxEmoji(D.weather_code[fi]||0)}</div>
-            <div class="fcd-tmp"><b>${Math.round(D.temperature_2m_max[fi]||0)}°</b>/<span>${Math.round(D.temperature_2m_min[fi]||0)}°</span></div>
+            <div class="fcd-ico">${wxEmoji(D.weather_code[ai]||0)}</div>
+            <div class="fcd-tmp"><b>${Math.round(D.temperature_2m_max[ai]||0)}°</b>/<span>${Math.round(D.temperature_2m_min[ai]||0)}°</span></div>
             <div class="fcd-dot ${fv}"></div>
-            <div class="fcd-det">${Math.round(D.wind_speed_10m_max[fi]||0)} ${degToDir(D.wind_direction_10m_dominant[fi]||0)}</div>
-            <div class="fcd-det">RH ${Math.round(D.relative_humidity_2m_mean[fi]||0)}%</div>
+            <div class="fcd-det">${Math.round(D.wind_speed_10m_max[ai]||0)} ${degToDir(D.wind_direction_10m_dominant[ai]||0)}</div>
+            <div class="fcd-det">RH ${Math.round(D.relative_humidity_2m_mean[ai]||0)}%</div>
           </button>`;
         }).join('');
         fcEl.innerHTML=`<div class="fc-section">
