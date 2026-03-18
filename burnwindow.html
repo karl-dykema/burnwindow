@@ -1830,7 +1830,7 @@ function cclear(){
 
 // ═══ API CALLS ════════════════════════════════════════════════════════════
 async function fetchWeather(lat,lon){
-  const k=`wx7_${lat}_${lon}`;  // wx7: +snowfall in daily
+  const k=`wx8_${lat}_${lon}`;  // wx8: snowfall → snowfall_sum (correct field name)
   const c=cget(k);if(c)return c;
   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
     `&current=temperature_2m,wind_speed_10m,wind_direction_10m,relative_humidity_2m,precipitation_probability`+
