@@ -4147,18 +4147,16 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
   // IMPORTANT: Do NOT add &vars= filter here — Synoptic only returns stations
   // that report ALL listed vars, which silently drops most RAWS. We filter
   // client-side in the walk loop below. Also skip &within — same problem.
-  // Build query — prefer actual fire-weather RAWS (BLM network 2, USFS network 17)
-  // over road weather sensors (DOT RWIS, network 30) and hobby stations.
-  // Synoptic network IDs: 1=NWS/NOAA, 2=BLM RAWS, 17=USFS RAWS, 114=NIFC.
-  // We request network=1,2,17,114 to exclude RWIS and personal weather stations
-  // while still catching ASOS airports as fallback when no RAWS are nearby.
-  const url = 'https://api.synopticdata.com/v2/stations/latest'
+  // Build base URL — network filter added on first try, dropped on retry if needed.
+  const urlBase = 'https://api.synopticdata.com/v2/stations/latest'
     + '?token='   + encodeURIComponent(token)
     + '&radius='  + lat + ',' + lon + ',' + RAWS_RADIUS_KM
     + '&limit='   + RAWS_MAX_CANDIDATES
-    + '&network=1,2,17,114'  // NWS/NOAA, BLM RAWS, USFS RAWS, NIFC — excludes RWIS/hobby
     + '&units=metric'
     + '&obtimezone=local';
+  // Prefer fire-weather RAWS/NOAA networks; fall back to any network if none found.
+  // Synoptic network IDs: 1=NWS/NOAA, 2=BLM RAWS, 17=USFS RAWS, 114=NIFC.
+  const urlFiltered = urlBase + '&network=1,2,17,114';
 
   // ── 30-minute cache for RAWS responses ───────────────────────────────────
   // Synoptic stations report hourly obs; 30 min is fresh enough for planning
@@ -4174,21 +4172,32 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
   }
 
   if(!stations){
-    console.log('[BurnWindow RAWS] unit', unitIdx, 'querying:', url);
+    console.log('[BurnWindow RAWS] unit', unitIdx, 'querying (filtered):', urlFiltered);
   try{
-    const resp = await fetch(url);
+    // First try: preferred networks only (RAWS/NOAA/NIFC)
+    const resp = await fetch(urlFiltered);
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    console.log('[BurnWindow RAWS] unit', unitIdx,
-      data.SUMMARY?.RESPONSE_CODE === 1 ? 'OK' : 'code ' + data.SUMMARY?.RESPONSE_CODE,
-      (data.STATION||[]).length + ' stations');
     if(data.SUMMARY?.RESPONSE_CODE === 2){
       throw new Error('Auth failed: ' + (data.SUMMARY?.RESPONSE_MESSAGE || 'invalid token'));
     }
-    if(!data.STATION || data.STATION.length === 0){
+    let stList = data.STATION || [];
+    console.log('[BurnWindow RAWS] unit', unitIdx, 'filtered query:', stList.length + ' stations');
+
+    // Fallback: if no RAWS/NOAA stations in radius, retry without network filter
+    if(stList.length === 0){
+      console.log('[BurnWindow RAWS] unit', unitIdx, 'no filtered results — retrying without network filter');
+      const resp2 = await fetch(urlBase);
+      if(!resp2.ok) throw new Error('HTTP ' + resp2.status);
+      const data2 = await resp2.json();
+      stList = data2.STATION || [];
+      console.log('[BurnWindow RAWS] unit', unitIdx, 'unfiltered query:', stList.length + ' stations');
+    }
+
+    if(stList.length === 0){
       throw new Error('no stations in radius');
     }
-    stations = data.STATION;
+    stations = stList;
     // Store raw stations array with its own TTL
     try{ localStorage.setItem(rawsCacheKey + '_raw', JSON.stringify({ts: Date.now(), stations})); }catch(e){}
   }catch(e){
