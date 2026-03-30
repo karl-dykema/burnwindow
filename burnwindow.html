@@ -3028,9 +3028,10 @@ async function testGlffToken(){
   if(btn){ btn.disabled = true; btn.textContent = '…'; }
   setTokenStatus('Testing…', '');
   try{
-    // KDTW = Detroit Metro ASOS — major NWS station, reliably accessible on free tier
+    // KDTW = Detroit Metro ASOS — major NWS station, reliably accessible on free tier.
+    // &within=1440 is required — free tier blocks queries without a time window.
     const url = 'https://api.synopticdata.com/v2/stations/latest'
-              + '?stid=KDTW&token=' + encodeURIComponent(token);
+              + '?stid=KDTW&within=1440&token=' + encodeURIComponent(token);
     const resp = await fetch(url);
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
@@ -4204,9 +4205,10 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     const rc = data.SUMMARY?.RESPONSE_CODE;
-    // If response lacks expected structure, log full body so we can diagnose API changes
-    if(rc === undefined){
-      console.warn('[BurnWindow RAWS] unit', unitIdx, 'unexpected response structure:', JSON.stringify(data).slice(0, 300));
+    // Synoptic free tier returns HTTP 200 with {status:403} body for unsupported queries
+    // (e.g. radius/geographic search requires a paid plan).
+    if(data.status === 403 || (rc === undefined && data.message)){
+      throw new Error('tier:' + (data.message || 'radius search requires paid Synoptic plan'));
     }
     if(rc === 2){
       throw new Error('Auth failed: ' + (data.SUMMARY?.RESPONSE_MESSAGE || 'invalid token'));
@@ -4221,10 +4223,12 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
       if(!resp2.ok) throw new Error('HTTP ' + resp2.status);
       const data2 = await resp2.json();
       const rc2 = data2.SUMMARY?.RESPONSE_CODE;
-      if(rc2 === undefined){
+      if(data2.status === 403 || (rc2 === undefined && data2.message)){
         console.warn('[BurnWindow RAWS] unit', unitIdx, 'unfiltered unexpected response:', JSON.stringify(data2).slice(0, 300));
+        stList = []; // treat as no results; stale cache fallback will handle it
+      } else {
+        stList = data2.STATION || [];
       }
-      stList = data2.STATION || [];
       console.log('[BurnWindow RAWS] unit', unitIdx, 'unfiltered query rc=' + rc2 + ':', stList.length + ' stations');
     }
 
@@ -4242,11 +4246,11 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
       console.log('[BurnWindow RAWS] unit', unitIdx, 'using stale cache (' + ageMin + 'm old)');
       stations = rawsCachedEntry.stations;
     } else {
-      renderGrid(
-        openMeteoComps,
-        '⚠ RAWS unavailable (' + (e.message || 'fetch error') + ') — showing model estimate',
-        'warn'
-      );
+      const isTier = e.message && e.message.startsWith('tier:');
+      const msg = isTier
+        ? '⚠ Synoptic location search requires a paid plan — showing model estimate'
+        : '⚠ RAWS unavailable (' + (e.message || 'fetch error') + ') — showing model estimate';
+      renderGrid(openMeteoComps, msg, 'warn');
       return;
     }
   }
