@@ -9189,11 +9189,10 @@ const STATION_DB=[
 ["NSTU","Pago Pago",-14.331,-170.7105,0]
 ];
 
-// ASOS_WX_DB — pre-filtered subset of STATION_DB: only ASOS/NWS stations with
-// standard 4-letter K/P ICAO IDs that weather.gov supports. Built once at startup.
-const ASOS_WX_DB = STATION_DB.filter(function(s){
-  return s[4] === 0 && /^[KP][A-Z0-9]{3}$/.test(s[0]);
-});
+// ASOS_WX_DB — pre-filtered subset of STATION_DB: all ASOS/NWS stations (type=0).
+// IEM stores continental US airports with 3-letter FAA codes (ADG, ACB, …);
+// fetchWeatherGovObs handles the K-prefix expansion for weather.gov lookups.
+const ASOS_WX_DB = STATION_DB.filter(function(s){ return s[4] === 0; });
 
 // findNearestStations — returns the n closest stations from STATION_DB,
 // sorted by adjusted distance (RAWS preferred over ASOS by up to 40km).
@@ -9259,19 +9258,27 @@ async function fetchSynopticStid(token, stids){
 
 // fetchWeatherGovObs — fetch current observations from weather.gov for a list of
 // candidate stations. Returns Synoptic-compatible station objects for any that
-// succeed. Only works for standard ICAO-format station IDs (4-letter K/P codes).
+// succeed.
+// IEM stores continental US ASOS stations with 3-letter FAA codes (e.g. ADG, ACB).
+// weather.gov uses 4-letter ICAO codes (KADG, KACB). For 3-letter codes we try
+// prepending "K" (covers all lower-48 airports). 4-letter K/P codes are used as-is.
 async function fetchWeatherGovObs(candidates){
-  // weather.gov only covers ASOS/NWS stations (type=0, or RAWS with NOAA links)
-  // Filter to stations likely in NWS system: 4-letter codes starting with K or P
-  const eligible = candidates.filter(function(s){
-    return /^[KP][A-Z0-9]{3}$/.test(s.stid);
+  // Build a list of {st, icao} pairs — derive the ICAO id for weather.gov
+  const eligible = candidates.map(function(s){
+    let icao = s.stid;
+    if(/^[A-Z0-9]{3}$/.test(s.stid)) icao = 'K' + s.stid; // 3-letter FAA → K-prefix
+    return { st: s, icao };
+  }).filter(function(e){
+    // keep 4-letter K/P codes and anything we just expanded
+    return /^[KP][A-Z0-9]{3}$/.test(e.icao);
   });
   if(!eligible.length) return [];
 
-  const results = await Promise.allSettled(eligible.map(async function(st){
+  const results = await Promise.allSettled(eligible.map(async function(e){
+    const st = e.st;
     try{
       const resp = await fetch(
-        'https://api.weather.gov/stations/' + st.stid + '/observations/latest',
+        'https://api.weather.gov/stations/' + e.icao + '/observations/latest',
         { headers: { 'Accept': 'application/geo+json,application/json' } }
       );
       if(!resp.ok) return null;
@@ -9299,7 +9306,7 @@ async function fetchWeatherGovObs(candidates){
 
       return { STID: st.stid, NAME: st.name, LATITUDE: st.lat, LONGITUDE: st.lon,
                DISTANCE: st.dist, OBSERVATIONS: obs, _src: 'wxgov' };
-    }catch(e){ return null; }
+    }catch(err){ return null; }
   }));
 
   return results
