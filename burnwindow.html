@@ -139,6 +139,22 @@ body::before {
 }
 .about-close-btn:hover { border-color: var(--amber); color: var(--amber); }
 
+/* ═══ UPDATE BANNER ══════════════════════════════════════════════════════ */
+#updateBanner {
+  display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 7px 20px; background: rgba(94,184,94,.08);
+  border-bottom: 1px solid rgba(94,184,94,.25);
+  font-family: var(--mono); font-size: 11px; color: rgba(94,184,94,.9);
+  letter-spacing: .4px;
+}
+#updateBanner.visible { display: flex; }
+#updateBanner button {
+  background: none; border: 1px solid rgba(94,184,94,.4); border-radius: 2px;
+  color: rgba(94,184,94,.9); font-family: var(--mono); font-size: 11px;
+  padding: 2px 10px; cursor: pointer; letter-spacing: .5px;
+}
+#updateBanner button:hover { background: rgba(94,184,94,.12); }
+
 /* ═══ NOTICE ═════════════════════════════════════════════════════════════ */
 .notice {
   font-family: var(--mono); font-size: 12px; color: rgba(212,120,14,.7);
@@ -1232,6 +1248,13 @@ body.mobile-view .topbar-right > .tbar-btn:not(#viewToggleBtn):not(#themeToggleB
 </head>
 <body>
 <div class="app">
+
+<!-- UPDATE BANNER — shown when a newer version is detected -->
+<div id="updateBanner">
+  <span>↑ A new version of BurnWindow is available.</span>
+  <button onclick="location.reload(true)">Refresh now</button>
+  <button onclick="document.getElementById('updateBanner').classList.remove('visible')" style="opacity:.5">Dismiss</button>
+</div>
 
 <!-- TOP BAR -->
 <div class="topbar">
@@ -4178,13 +4201,14 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     const resp = await fetch(urlFiltered);
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    if(data.SUMMARY?.RESPONSE_CODE === 2){
+    const rc = data.SUMMARY?.RESPONSE_CODE;
+    if(rc === 2){
       throw new Error('Auth failed: ' + (data.SUMMARY?.RESPONSE_MESSAGE || 'invalid token'));
     }
     let stList = data.STATION || [];
-    console.log('[BurnWindow RAWS] unit', unitIdx, 'filtered query:', stList.length + ' stations');
+    console.log('[BurnWindow RAWS] unit', unitIdx, 'filtered query rc=' + rc + ':', stList.length + ' stations');
 
-    // Fallback: if no RAWS/NOAA stations in radius, retry without network filter
+    // Fallback 1: if no RAWS/NOAA stations in radius, retry without network filter
     if(stList.length === 0){
       console.log('[BurnWindow RAWS] unit', unitIdx, 'no filtered results — retrying without network filter');
       const resp2 = await fetch(urlBase);
@@ -4195,19 +4219,26 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     }
 
     if(stList.length === 0){
-      throw new Error('no stations in radius');
+      throw new Error('no stations in radius (rc=' + rc + ')');
     }
     stations = stList;
     // Store raw stations array with its own TTL
     try{ localStorage.setItem(rawsCacheKey + '_raw', JSON.stringify({ts: Date.now(), stations})); }catch(e){}
   }catch(e){
     console.warn('[BurnWindow RAWS] unit', unitIdx, 'fetch failed:', e.message);
-    renderGrid(
-      openMeteoComps,
-      '⚠ RAWS unavailable (' + (e.message || 'fetch error') + ') — showing model estimate',
-      'warn'
-    );
-    return;
+    // Fallback 2: use expired cache rather than dropping to model estimate
+    if(rawsCachedEntry && rawsCachedEntry.stations && rawsCachedEntry.stations.length > 0){
+      const ageMin = Math.round((Date.now() - rawsCachedEntry.ts) / 60000);
+      console.log('[BurnWindow RAWS] unit', unitIdx, 'using stale cache (' + ageMin + 'm old)');
+      stations = rawsCachedEntry.stations;
+    } else {
+      renderGrid(
+        openMeteoComps,
+        '⚠ RAWS unavailable (' + (e.message || 'fetch error') + ') — showing model estimate',
+        'warn'
+      );
+      return;
+    }
   }
   } // end if(!stations) fetch block
 
@@ -5974,6 +6005,28 @@ detectStateAndRenderLinks();
 setTimeout(updateMapUnits, 2500);
 
 // ═══ ERROR TRACKING (SENTRY) ═════════════════════════════════════════════
+// ═══ VERSION CHECK ═══════════════════════════════════════════════════════════
+// On load, do a HEAD request to capture the current ETag of the deployed HTML.
+// Every 30 minutes, re-check — if ETag changed, show the update banner.
+// Skipped when running locally (file: protocol).
+let _deployEtag = null;
+async function _versionCheckTick(){
+  if(window.location.protocol === 'file:') return;
+  try{
+    const r = await fetch(window.location.href, {method:'HEAD', cache:'no-store'});
+    const tag = r.headers.get('etag') || r.headers.get('last-modified');
+    if(!tag) return;
+    if(_deployEtag === null){ _deployEtag = tag; return; } // baseline on first call
+    if(tag !== _deployEtag){
+      document.getElementById('updateBanner')?.classList.add('visible');
+    }
+  }catch(e){}
+}
+window.addEventListener('DOMContentLoaded', function(){
+  _versionCheckTick();
+  setInterval(_versionCheckTick, 30 * 60 * 1000);
+});
+
 // GoatCounter usage analytics are loaded via <script> tag in <head>.
 // Error tracking via Sentry — replace YOUR_SENTRY_DSN with your project DSN from sentry.io
 // Set to '' or leave as-is to disable.
