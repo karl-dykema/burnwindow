@@ -9189,16 +9189,33 @@ const STATION_DB=[
 ["NSTU","Pago Pago",-14.331,-170.7105,0]
 ];
 
+// ASOS_WX_DB — pre-filtered subset of STATION_DB: only ASOS/NWS stations with
+// standard 4-letter K/P ICAO IDs that weather.gov supports. Built once at startup.
+const ASOS_WX_DB = STATION_DB.filter(function(s){
+  return s[4] === 0 && /^[KP][A-Z0-9]{3}$/.test(s[0]);
+});
+
 // findNearestStations — returns the n closest stations from STATION_DB,
 // sorted by adjusted distance (RAWS preferred over ASOS by up to 40km).
 function findNearestStations(lat, lon, n){
-  const RAWS_PREFER_KM = 40; // bonus km we'll travel to get a real fire-weather RAWS
+  const RAWS_PREFER_KM = 40;
   const scored = STATION_DB.map(function(s){
     const dist = haversineKm(lat, lon, s[2], s[3]);
     return { stid: s[0], name: s[1], lat: s[2], lon: s[3], type: s[4], dist,
              score: dist + (s[4] === 1 ? 0 : RAWS_PREFER_KM) };
   });
   scored.sort(function(a,b){ return a.score - b.score; });
+  return scored.slice(0, n);
+}
+
+// findNearestAsosWxGov — returns n closest stations from ASOS_WX_DB by pure distance.
+// Used for weather.gov fallback (no RAWS preference, only valid ICAO stations).
+function findNearestAsosWxGov(lat, lon, n){
+  const scored = ASOS_WX_DB.map(function(s){
+    return { stid: s[0], name: s[1], lat: s[2], lon: s[3], type: 0,
+             dist: haversineKm(lat, lon, s[2], s[3]) };
+  });
+  scored.sort(function(a,b){ return a.dist - b.dist; });
   return scored.slice(0, n);
 }
 
@@ -9368,16 +9385,8 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
   }
 
   // ── find nearest candidate stations from embedded database ─────────────
-  const nearestAll  = findNearestStations(lat, lon, 12); // top 12 overall (RAWS-preferred)
-  // For weather.gov fallback we need ASOS/NWS stations specifically (K/P prefix IDs).
-  // Find nearest 8 ASOS by pure distance (no RAWS preference) so at least some qualify.
-  const nearestAsos = (function(){
-    const asos = STATION_DB.filter(function(s){ return s[4] === 0 && /^[KP][A-Z0-9]{3}$/.test(s[0]); });
-    return asos.map(function(s){
-      return { stid: s[0], name: s[1], lat: s[2], lon: s[3], type: 0,
-               dist: haversineKm(lat, lon, s[2], s[3]) };
-    }).sort(function(a,b){ return a.dist - b.dist; }).slice(0, 8);
-  })();
+  const nearestAll  = findNearestStations(lat, lon, 12);     // top 12 overall (RAWS-preferred)
+  const nearestAsos = findNearestAsosWxGov(lat, lon, 8);     // top 8 ASOS for weather.gov fallback
   const token = getGlffToken();
 
   // ── 30-minute cache ────────────────────────────────────────────────────
