@@ -9202,22 +9202,42 @@ function findNearestStations(lat, lon, n){
   return scored.slice(0, n);
 }
 
-// fetchSynopticStid — query Synoptic by explicit STIDs (free-tier compatible).
-// Returns Synoptic STATION array, or throws on auth/HTTP failure.
+// fetchSynopticStid — query Synoptic/MesoWest by explicit STIDs (free-tier compatible).
+// Tries api.synopticdata.com first, falls back to api.mesowest.net (GLFF/MesoWest).
+// Both use the same token and return the same response format.
 async function fetchSynopticStid(token, stids){
-  const url = 'https://api.synopticdata.com/v2/stations/latest'
-    + '?token=' + encodeURIComponent(token)
+  const params = '?token=' + encodeURIComponent(token)
     + '&stid=' + stids.join(',')
     + '&within=1440'
     + '&units=metric'
     + '&obtimezone=local';
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
-  if(data.status === 403 || (data.SUMMARY?.RESPONSE_CODE === 2)){
-    throw new Error('Synoptic auth: ' + (data.SUMMARY?.RESPONSE_MESSAGE || data.message || 'unauthorized'));
+
+  // Try both endpoints — Synoptic primary, MesoWest (GLFF backend) as fallback
+  const ENDPOINTS = [
+    'https://api.synopticdata.com/v2/stations/latest',
+    'https://api.mesowest.net/v2/stations/latest',
+  ];
+
+  let lastErr = null;
+  for(const base of ENDPOINTS){
+    try{
+      const resp = await fetch(base + params);
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if(data.status === 403 || data.SUMMARY?.RESPONSE_CODE === 2){
+        throw new Error('auth: ' + (data.SUMMARY?.RESPONSE_MESSAGE || data.message || 'unauthorized'));
+      }
+      const stations = data.STATION || [];
+      if(stations.length > 0) return stations; // success — stop trying
+      // Zero stations from this endpoint — try next before giving up
+      lastErr = new Error('0 stations from ' + base);
+    }catch(e){
+      console.warn('[BurnWindow RAWS]', base, 'failed:', e.message);
+      lastErr = e;
+    }
   }
-  return data.STATION || [];
+  // All endpoints failed or returned 0 stations
+  throw lastErr || new Error('all Mesonet endpoints failed');
 }
 
 // fetchWeatherGovObs — fetch current observations from weather.gov for a list of
@@ -9348,7 +9368,16 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
   }
 
   // ── find nearest candidate stations from embedded database ─────────────
-  const nearestAll  = findNearestStations(lat, lon, 12); // top 12 overall
+  const nearestAll  = findNearestStations(lat, lon, 12); // top 12 overall (RAWS-preferred)
+  // For weather.gov fallback we need ASOS/NWS stations specifically (K/P prefix IDs).
+  // Find nearest 8 ASOS by pure distance (no RAWS preference) so at least some qualify.
+  const nearestAsos = (function(){
+    const asos = STATION_DB.filter(function(s){ return s[4] === 0 && /^[KP][A-Z0-9]{3}$/.test(s[0]); });
+    return asos.map(function(s){
+      return { stid: s[0], name: s[1], lat: s[2], lon: s[3], type: 0,
+               dist: haversineKm(lat, lon, s[2], s[3]) };
+    }).sort(function(a,b){ return a.dist - b.dist; }).slice(0, 8);
+  })();
   const token = getGlffToken();
 
   // ── 30-minute cache ────────────────────────────────────────────────────
@@ -9380,7 +9409,7 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     if(!stations || stations.length === 0){
       try{
         console.log('[BurnWindow RAWS] unit', unitIdx, 'trying weather.gov ASOS fallback');
-        stations = await fetchWeatherGovObs(nearestAll);
+        stations = await fetchWeatherGovObs(nearestAsos);
         console.log('[BurnWindow RAWS] unit', unitIdx, 'weather.gov returned', stations.length, 'stations');
       }catch(e){
         console.warn('[BurnWindow RAWS] unit', unitIdx, 'weather.gov failed:', e.message);
