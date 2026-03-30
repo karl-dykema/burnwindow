@@ -1294,8 +1294,8 @@ body.mobile-view .topbar-right > .tbar-btn:not(#viewToggleBtn):not(#themeToggleB
 
     <div class="about-section">
       <strong>Data Sources</strong><br>
-      <strong>Weather &amp; Forecast</strong> — <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> (7-day forecast + 60-day archive for FWI chain; free for non-commercial use)<br>
-      <strong>RAWS / FFMC</strong> — <a href="https://synopticdata.com" target="_blank">Synoptic Data</a> via GLFF API (requires free API token; optional)<br>
+      <strong>Weather &amp; Forecast</strong> — <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> (7-day forecast + 60-day archive for FWI chain; free, no key required)<br>
+      <strong>RAWS / Station Obs</strong> — nearest stations selected from an embedded database of ~5,000 RAWS and ASOS locations. Observations fetched in priority order: (1) <a href="https://synopticdata.com" target="_blank">Synoptic Data</a> / MesoWest API (free token optional — required for real RAWS); (2) <a href="https://www.weather.gov" target="_blank">NWS weather.gov</a> ASOS observations (no key, automatic fallback); (3) stale cached obs if recent fetch failed; (4) Open-Meteo model estimate as last resort. Non-noon observations (outside 10 am–4 pm local) always revert to the model for FWI calculation.<br>
       <strong>Air Quality (AQI)</strong> — <a href="https://www.airnow.gov" target="_blank">AirNow</a> / EPA (requires free API key)<br>
       <strong>Active Fire Detection</strong> — <a href="https://www.nifc.gov" target="_blank">NIFC</a> (public, no key required)<br>
       <strong>Weather Alerts</strong> — <a href="https://www.weather.gov" target="_blank">NWS / weather.gov</a> (public, no key required)<br>
