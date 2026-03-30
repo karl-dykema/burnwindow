@@ -3018,9 +3018,9 @@ function onTokenInput(){
   }, 600);
 }
 
-// testGlffToken — validates the Synoptic token using the /v2/auth endpoint,
-// which returns token metadata without requiring a station query.
-// Falls back to a /stations/latest stid probe if /v2/auth is unavailable.
+// testGlffToken — validates the Synoptic token using a lightweight stid query.
+// RESPONSE_CODE=1 means the token is valid regardless of station count
+// (some stations may be behind tier restrictions; that doesn't invalidate the token).
 async function testGlffToken(){
   const token = getGlffToken();
   if(!token){ setTokenStatus('Enter a token first', 'err'); return; }
@@ -3028,12 +3028,13 @@ async function testGlffToken(){
   if(btn){ btn.disabled = true; btn.textContent = '…'; }
   setTokenStatus('Testing…', '');
   try{
-    // Primary: use the Synoptic auth endpoint (lightweight, no station data needed)
-    const authUrl = 'https://api.synopticdata.com/v2/auth?token=' + encodeURIComponent(token);
-    const resp = await fetch(authUrl);
+    // KDTW = Detroit Metro ASOS — major NWS station, reliably accessible on free tier
+    const url = 'https://api.synopticdata.com/v2/stations/latest'
+              + '?stid=KDTW&token=' + encodeURIComponent(token);
+    const resp = await fetch(url);
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    // Auth endpoint returns SUMMARY.RESPONSE_CODE 1=valid, 2=invalid
+    // RESPONSE_CODE 1 = auth success, 2 = invalid token
     const code = data?.SUMMARY?.RESPONSE_CODE;
     if(code === 2){
       throw new Error(data.SUMMARY?.RESPONSE_MESSAGE || 'Invalid token');
@@ -3041,9 +3042,8 @@ async function testGlffToken(){
     if(code === 1){
       setTokenStatus('✓ Token valid (Synoptic API)', 'ok');
     } else {
-      // Unexpected response structure — log and still accept if HTTP was OK
-      console.warn('[BurnWindow token test] unexpected auth response:', JSON.stringify(data).slice(0,200));
-      setTokenStatus('✓ Token accepted (Synoptic API)', 'ok');
+      console.warn('[BurnWindow token test] unexpected response:', JSON.stringify(data).slice(0,200));
+      setTokenStatus('✓ Token accepted — unexpected response structure', 'ok');
     }
     const inp = document.getElementById('glffTokenInput');
     if(inp){ inp.classList.remove('token-err'); inp.classList.add('token-ok'); }
