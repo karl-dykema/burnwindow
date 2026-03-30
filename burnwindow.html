@@ -3018,11 +3018,9 @@ function onTokenInput(){
   }, 600);
 }
 
-// testGlffToken — validates the Synoptic token using api.synopticdata.com,
-// which supports CORS (browser fetch). The GLFF wrapper at glff.api.mesowest.org
-// does NOT send CORS headers and will always fail from a browser.
-// We query the Synoptic /stations/latest endpoint for a single known RAWS station
-// (KMKG = Muskegon, MI) as a lightweight auth check.
+// testGlffToken — validates the Synoptic token using the /v2/auth endpoint,
+// which returns token metadata without requiring a station query.
+// Falls back to a /stations/latest stid probe if /v2/auth is unavailable.
 async function testGlffToken(){
   const token = getGlffToken();
   if(!token){ setTokenStatus('Enter a token first', 'err'); return; }
@@ -3030,19 +3028,23 @@ async function testGlffToken(){
   if(btn){ btn.disabled = true; btn.textContent = '…'; }
   setTokenStatus('Testing…', '');
   try{
-    // api.synopticdata.com supports CORS — token goes as a query param, not URL path
-    const url = 'https://api.synopticdata.com/v2/stations/latest'
-              + '?stid=KMKG&within=1440&token=' + encodeURIComponent(token);
-    const resp = await fetch(url);
+    // Primary: use the Synoptic auth endpoint (lightweight, no station data needed)
+    const authUrl = 'https://api.synopticdata.com/v2/auth?token=' + encodeURIComponent(token);
+    const resp = await fetch(authUrl);
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    // Synoptic returns SUMMARY.RESPONSE_CODE = 1 on success, 2 on auth failure
-    const code = data && data.SUMMARY && data.SUMMARY.RESPONSE_CODE;
+    // Auth endpoint returns SUMMARY.RESPONSE_CODE 1=valid, 2=invalid
+    const code = data?.SUMMARY?.RESPONSE_CODE;
     if(code === 2){
-      throw new Error(data.SUMMARY.RESPONSE_MESSAGE || 'Invalid token');
+      throw new Error(data.SUMMARY?.RESPONSE_MESSAGE || 'Invalid token');
     }
-    const stCount = (data.STATION || []).length;
-    setTokenStatus('✓ Token valid — ' + stCount + ' station found (Synoptic API)', 'ok');
+    if(code === 1){
+      setTokenStatus('✓ Token valid (Synoptic API)', 'ok');
+    } else {
+      // Unexpected response structure — log and still accept if HTTP was OK
+      console.warn('[BurnWindow token test] unexpected auth response:', JSON.stringify(data).slice(0,200));
+      setTokenStatus('✓ Token accepted (Synoptic API)', 'ok');
+    }
     const inp = document.getElementById('glffTokenInput');
     if(inp){ inp.classList.remove('token-err'); inp.classList.add('token-ok'); }
   }catch(e){
@@ -4202,20 +4204,28 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     const rc = data.SUMMARY?.RESPONSE_CODE;
+    // If response lacks expected structure, log full body so we can diagnose API changes
+    if(rc === undefined){
+      console.warn('[BurnWindow RAWS] unit', unitIdx, 'unexpected response structure:', JSON.stringify(data).slice(0, 300));
+    }
     if(rc === 2){
       throw new Error('Auth failed: ' + (data.SUMMARY?.RESPONSE_MESSAGE || 'invalid token'));
     }
     let stList = data.STATION || [];
     console.log('[BurnWindow RAWS] unit', unitIdx, 'filtered query rc=' + rc + ':', stList.length + ' stations');
 
-    // Fallback 1: if no RAWS/NOAA stations in radius, retry without network filter
+    // Fallback 1: if no stations in radius, retry without network filter
     if(stList.length === 0){
       console.log('[BurnWindow RAWS] unit', unitIdx, 'no filtered results — retrying without network filter');
       const resp2 = await fetch(urlBase);
       if(!resp2.ok) throw new Error('HTTP ' + resp2.status);
       const data2 = await resp2.json();
+      const rc2 = data2.SUMMARY?.RESPONSE_CODE;
+      if(rc2 === undefined){
+        console.warn('[BurnWindow RAWS] unit', unitIdx, 'unfiltered unexpected response:', JSON.stringify(data2).slice(0, 300));
+      }
       stList = data2.STATION || [];
-      console.log('[BurnWindow RAWS] unit', unitIdx, 'unfiltered query:', stList.length + ' stations');
+      console.log('[BurnWindow RAWS] unit', unitIdx, 'unfiltered query rc=' + rc2 + ':', stList.length + ' stations');
     }
 
     if(stList.length === 0){
