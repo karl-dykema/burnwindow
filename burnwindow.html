@@ -11182,17 +11182,23 @@ function toggleDaylight(){
   localStorage.setItem('bw_daylight', isLight ? '1' : '');
 }
 
-// Restore view/theme preferences from localStorage on load
+// Restore view/theme preferences from localStorage on load.
+// On first visit from a mobile/tablet browser (no saved pref), default to Field View.
 (function restoreViewPrefs(){
   if(localStorage.getItem('bw_daylight') === '1'){
     document.body.classList.add('daylight');
     const btn = document.getElementById('themeToggleBtn');
     if(btn) btn.textContent = '🌙 Dark';
   }
-  if(localStorage.getItem('bw_mobile_view') === '1'){
+  const savedMobile = localStorage.getItem('bw_mobile_view');
+  const isMobileBrowser = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+  if(savedMobile === '1' || (savedMobile === null && isMobileBrowser)){
     document.body.classList.add('mobile-view');
     const btn = document.getElementById('viewToggleBtn');
     if(btn) btn.textContent = '🖥 Desktop';
+    // Persist the auto-detected choice so toggling back works as expected
+    if(savedMobile === null) localStorage.setItem('bw_mobile_view', '1');
   }
 })();
 
