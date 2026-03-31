@@ -3308,7 +3308,11 @@ function toggleMap(){
     sec.style.display='block';
     btn.textContent='▲ Hide Map';
     mapShown=true;
-    if(!map) setTimeout(initMap,50); // wait for display:block
+    if(!map){
+      setTimeout(initMap, 150); // wait for display:block to paint, longer for iOS
+    } else {
+      setTimeout(function(){ map.invalidateSize(); }, 150); // re-shown after hide
+    }
   } else {
     sec.style.display='none';
     btn.textContent='▼ Show Map';
@@ -3319,11 +3323,14 @@ function toggleMap(){
 function initMap(){
   if(map) return;
   // Dark tile layer (CartoDB Dark Matter — free, no key)
+  // Note: omit {r} retina suffix — causes tile failures on some iOS browsers
   map=L.map('bwMap',{zoomControl:true});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',{
     attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
     maxZoom:19, subdomains:'abcd'
   }).addTo(map);
+  // invalidateSize after tiles have had a moment to load — critical on iOS
+  setTimeout(function(){ map.invalidateSize(); }, 200);
   updateMapUnits();
 }
 
