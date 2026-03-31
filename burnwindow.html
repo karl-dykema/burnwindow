@@ -1239,6 +1239,11 @@ body.mobile-view .fwi-stat-key  { font-size: 14px !important; }
 body.mobile-view .fwi-stat-cls  { font-size: 13px !important; }
 body.mobile-view .rx-window-summary { font-size: 18px !important; }
 body.mobile-view .topbar-right > .tbar-btn:not(#viewToggleBtn):not(#themeToggleBtn) { display: none; }
+/* Field view footer: hide GPS coords, wrap buttons to fill full width */
+body.mobile-view .uc-foot        { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+body.mobile-view .uc-foot-left   { display: none !important; }
+body.mobile-view .uc-foot-right  { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; padding: 10px 8px; font-size: 13px; }
 
 /* Noon marker on hourly bar cells — subtle vertical rule at noon */
 .hcell.noon-mark { border-left: 2px solid rgba(212,120,14,.55) !important; }
