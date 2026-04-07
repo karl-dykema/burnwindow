@@ -3931,12 +3931,12 @@ async function fetchUnitAQI(unitIdx, lat, lon){
       + '<a class="aqi-maplink" href="https://fire.airnow.gov/" target="_blank">Fire &amp; Smoke Map ↗</a>';
 
   } catch(e) {
+    const isAbort = e.name === 'AbortError';
     const isCors = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('CORS') || e.name === 'TimeoutError';
-    el.innerHTML = isCors
-      ? '<span class="aqi-label">💨 AQI</span><span style="font-size:10px;color:var(--muted)">blocked (CORS/file://)</span>'
-        + '<a class="aqi-maplink" href="https://fire.airnow.gov/" target="_blank">Fire &amp; Smoke Map ↗</a>'
-      : '<span class="aqi-label">💨 AQI</span><span style="font-size:10px;color:var(--muted)">' + e.message + '</span>'
-        + '<a class="aqi-maplink" href="https://fire.airnow.gov/" target="_blank">map ↗</a>';
+    const msg = isAbort ? 'timed out — tap ↻ to retry' : isCors ? 'blocked (CORS/file://)' : e.message;
+    el.innerHTML = '<span class="aqi-label">💨 AQI</span>'
+      + '<span style="font-size:10px;color:var(--muted)">' + msg + '</span>'
+      + '<a class="aqi-maplink" href="https://fire.airnow.gov/" target="_blank">Fire &amp; Smoke Map ↗</a>';
     console.warn('[BurnWindow AQI]', e.message);
   }
 }
