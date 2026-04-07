@@ -1471,7 +1471,7 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
       <button class="tbar-btn" onclick="event.stopPropagation();refreshNetworkPanel()" style="font-size:10px;padding:3px 10px;">↻ Refresh</button>
     </div>
-    <div id="networkPanelBody" style="font-family:var(--mono);font-size:11px;color:var(--muted);">Loading…</div>
+    <div id="networkPanelBody" style="font-family:var(--mono);font-size:11px;color:var(--muted);overflow-x:auto;-webkit-overflow-scrolling:touch;">Loading…</div>
   </div>
 </div>
 
@@ -9991,6 +9991,7 @@ function renderUnits(){
       <div class="uc-foot">
         <span class="uc-foot-left">📍 ${unit.lat.toFixed(4)}, ${unit.lon.toFixed(4)}
           <button class="spot-wx-link" onclick="fetchSpotWx(${i})" title="Fetch NWS point forecast summary">📡 NWS Spot Wx</button>
+          <a class="spot-wx-link" href="https://app.watchduty.org/@${unit.lat.toFixed(4)},${unit.lon.toFixed(4)},12z" target="_blank" rel="noopener" title="Open in Watch Duty">🗺 Watch Duty</a>
         </span>
         <div class="uc-foot-right">
           <button class="fc-sbtn accent" onclick="openGNG(${i})" title="Go / No-Go Checklist">✔ Go/No-Go</button>
@@ -11097,9 +11098,9 @@ function refreshNetworkPanel(){
       + '</div>';
   }
 
-  el.innerHTML =
+  el.innerHTML = '<div style="min-width:460px;">'
     // Column headers
-    '<div style="display:grid;grid-template-columns:12px 140px 1fr 90px 80px;gap:8px;padding:0 0 6px;'
+    + '<div style="display:grid;grid-template-columns:12px 140px 1fr 90px 80px;gap:8px;padding:0 0 6px;'
     + 'border-bottom:2px solid var(--border2);font-size:10px;color:var(--muted2);letter-spacing:.5px;">'
     + '<span></span><span>SOURCE</span><span>PAYLOAD EST.</span><span>TTL</span><span>LAST FETCH</span></div>'
     // Rows
@@ -11142,6 +11143,7 @@ function refreshNetworkPanel(){
     + '<div style="font-size:10px;color:var(--muted2);margin-top:8px;">'
     + '● fresh cache &nbsp; ● stale (will re-fetch) &nbsp; ○ not yet fetched &nbsp;'
     + '| FWI chain: daily fetch (incremental 1-2 day patch after first run)'
+    + '</div>'
     + '</div>';
 }
 
