@@ -19,7 +19,7 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 - **Ventilation Index** — boundary layer height × transport wind
 - **AQI** — Air quality via AirNow API (requires free key)
 - **Nearby active fires** — NIFC incident detection with distance and acreage; wildfires and nearby prescribed burns (RX) shown separately
-- **RAWS integration** — live FFMC from nearest Remote Automated Weather Station (requires Synoptic Data token); observations outside the 10 AM–4 PM window automatically fall back to Open-Meteo model values to maintain FWI accuracy
+- **Station observations** — current weather from the nearest station, fetched in priority order: (1) Synoptic Data RAWS (free token optional — provides actual fire-weather stations); (2) NWS weather.gov ASOS airport observations (no key required, automatic fallback); (3) Open-Meteo forecast model as last resort. Observations outside the 10 AM–4 PM window revert to model values to maintain FWI accuracy.
 - **5-day forecast** — clickable forecast strip updates all FWI and FBP outputs for each forecast day
 - **Go/No-Go modal** — structured decision checklist with burn log
 - **CSV import/export** — bulk unit management
@@ -32,14 +32,14 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 
 ## Get Your API Keys (5 minutes)
 
-BurnWindow works without any keys, but the best data comes from two free APIs. Get both before your first burn.
+BurnWindow works out of the box with no keys. Without any setup, it automatically uses NWS weather.gov airport observations for current conditions. Two free optional keys unlock better data.
 
-**1. Synoptic Data — live RAWS weather station observations**
-1. Go to [synopticdata.com](https://synopticdata.com) → **Sign Up** (free)
-2. After confirming your email, go to your account → **API Tokens** → create a token
-3. In BurnWindow, open the **⚙ Synoptic / RAWS** panel at the bottom of the page and paste your token
+**1. Synoptic Data — fire-weather RAWS station observations (optional, recommended)**
+1. Go to [developers.synopticdata.com/signup](https://developers.synopticdata.com/signup) → **Sign Up** (free)
+2. After confirming your email, go to your account → **API Tokens** → copy your Public Token
+3. In BurnWindow, open the **🛰 Synoptic Data Token** panel at the bottom of the page and paste your token
 
-This unlocks live FFMC readings from the nearest Remote Automated Weather Station (RAWS) to each of your burn units — real observed data instead of model output.
+Without a token, BurnWindow falls back to the nearest airport (ASOS) via NWS weather.gov — this works fine for most users. A Synoptic token upgrades to actual fire-weather RAWS stations, which report conditions more relevant to prescribed burn decision-making (forest/rangeland sites rather than airports).
 
 **2. AirNow — air quality index (AQI)**
 1. Go to [docs.airnowapi.org](https://docs.airnowapi.org) → **Register**
@@ -91,7 +91,8 @@ Set the fuel type per unit in the unit editor. Optionally add slope (%) and gras
 | Data | Provider | License |
 |---|---|---|
 | Weather forecast + archive | [Open-Meteo](https://open-meteo.com) | Free non-commercial / paid commercial |
-| RAWS observations | [Synoptic Data](https://synopticdata.com) | Free tier / paid commercial |
+| Station obs (airport ASOS) | [NWS weather.gov](https://www.weather.gov) | Public domain, no key required |
+| Station obs (fire-weather RAWS) | [Synoptic Data](https://synopticdata.com) | Free tier / paid commercial |
 | Air quality (AQI) | [AirNow / EPA](https://www.airnow.gov) | Public (non-commercial) |
 | Active fire incidents | [NIFC](https://www.nifc.gov) | Public domain |
 | Weather alerts | [NWS / weather.gov](https://www.weather.gov) | Public domain |
