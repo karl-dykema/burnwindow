@@ -1873,10 +1873,17 @@ async function fetchWeather(lat,lon){
     `&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_direction_10m_dominant,precipitation_sum,`+
     `precipitation_probability_max,relative_humidity_2m_mean,relative_humidity_2m_min,weather_code,snowfall_sum`+
     `&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7&past_days=60`;
-  const ctrl=new AbortController(); const _t=setTimeout(()=>ctrl.abort(),30000);
-  let r; try{ r=await fetch(url,{signal:ctrl.signal}); }finally{ clearTimeout(_t); }
-  if(!r.ok)throw new Error(`Weather fetch failed (HTTP ${r.status})`);
-  const d=await r.json();cset(k,d);return d;
+  async function _doFetch(attempt){
+    const ctrl=new AbortController(); const _t=setTimeout(()=>ctrl.abort(),30000);
+    let r; try{ r=await fetch(url,{signal:ctrl.signal}); }finally{ clearTimeout(_t); }
+    if(r.status===429 && attempt<3){
+      await new Promise(res=>setTimeout(res, attempt*5000));
+      return _doFetch(attempt+1);
+    }
+    if(!r.ok)throw new Error(`Weather fetch failed (HTTP ${r.status})`);
+    const d=await r.json();cset(k,d);return d;
+  }
+  return _doFetch(1);
 }
 
 async function fetchAlerts(lat,lon){
@@ -10004,8 +10011,8 @@ function renderUnits(){
       </div>`;
     grid.appendChild(card);
 
-    // Fetch + render — stagger requests 300ms apart to avoid rate-limiting Open-Meteo
-    const _fetchDelay = cget(`wx8_${unit.lat}_${unit.lon}`) ? 0 : i * 300;
+    // Fetch + render — stagger requests 500ms apart to avoid rate-limiting Open-Meteo
+    const _fetchDelay = cget(`wx8_${unit.lat}_${unit.lon}`) ? 0 : i * 500;
     setTimeout(function(){
     Promise.all([
       fetchWeather(unit.lat, unit.lon),
