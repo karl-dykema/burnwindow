@@ -3242,10 +3242,10 @@ async function checkNearbyFires(unitIdx, lat, lon){
     return list.map(f => {
       const dist = Math.round(f.distKm);
       const acresTxt = f.acres > 0 ? Math.round(f.acres).toLocaleString() + ' ac' : '';
-      const searchUrl = 'https://www.google.com/maps?q=' + f.lat + ',' + f.lon;
+      const wdUrl = 'https://app.watchduty.org/@' + f.lat.toFixed(4) + ',' + f.lon.toFixed(4) + ',12z';
       return '<div class="fire-incident-row">'
         + '<span class="fire-incident-dist">~' + dist + ' km</span>'
-        + '<span class="fire-incident-name"><a href="' + searchUrl + '" target="_blank">' + f.name + '</a></span>'
+        + '<span class="fire-incident-name"><a href="' + wdUrl + '" target="_blank" rel="noopener">' + f.name + '</a></span>'
         + (acresTxt ? '<span class="fire-incident-acres">' + acresTxt + '</span>' : '')
         + '</div>';
     }).join('');
@@ -3265,7 +3265,7 @@ async function checkNearbyFires(unitIdx, lat, lon){
       + '🔥 <strong>' + wildfires.length + ' active wildfire' + (wildfires.length > 1 ? 's' : '') + ' within 80km'
       + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)'
       + toggleTxt
-      + '<a href="https://app.watchduty.org/" target="_blank" onclick="event.stopPropagation()">📱 Watch Duty →</a></div>'
+      + '<a href="https://app.watchduty.org/@' + closest.lat.toFixed(4) + ',' + closest.lon.toFixed(4) + ',10z" target="_blank" rel="noopener" onclick="event.stopPropagation()">📱 Watch Duty →</a></div>'
       + '<div class="fire-incident-list wf" id="' + listId + '">' + incidentRows(wildfires) + '</div>';
   }
 
@@ -3280,7 +3280,8 @@ async function checkNearbyFires(unitIdx, lat, lon){
       + 'else{l.style.display=\'none\';if(t)t.textContent=\'▸ show all\'}">'
       + '🟢 <strong>' + rxBurns.length + ' nearby prescribed burn' + (rxBurns.length > 1 ? 's' : '') + ' within 80km'
       + '</strong> — nearest: <em>' + closest.name + '</em> (~' + dist + ' km)'
-      + toggleTxt + '</div>'
+      + toggleTxt
+      + '<a href="https://app.watchduty.org/@' + closest.lat.toFixed(4) + ',' + closest.lon.toFixed(4) + ',10z" target="_blank" rel="noopener" onclick="event.stopPropagation()">📱 Watch Duty →</a></div>'
       + '<div class="fire-incident-list rx" id="' + rxListId + '">' + incidentRows(rxBurns) + '</div>';
   }
 
