@@ -1571,7 +1571,7 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
   &nbsp;💡 <strong>LOCAL USE:</strong> Download and open in Chrome/Firefox/Safari — weather API calls require a local file context.
   &nbsp;|&nbsp; <strong>Data storage:</strong> Burn units, prescriptions, logs, and Go/No-Go history are saved in your browser's <em>localStorage</em> — local to this device, never uploaded. Clearing browser data will erase them. Back up by saving a copy of this HTML file.
   &nbsp;|&nbsp; <strong>⚠ Disclaimer:</strong> BurnWindow is an experimental decision-support tool. It does <strong>not</strong> replace a certified burn plan, spot weather forecast, trained burn boss judgment, or compliance with applicable laws. Always follow your written burn plan and maintain adequate holding resources.
-  &nbsp;|&nbsp; Weather: Open-Meteo free tier · Fire incidents: NIFC IRWIN · NWS alerts · FWI: GLFF/Synoptic (token required) · Caches 2 hrs.
+  &nbsp;|&nbsp; Weather: Open-Meteo · Fire incidents: NIFC IRWIN · NWS alerts · Station obs: NWS weather.gov (no key) or Synoptic RAWS (optional free token) · Caches 30 min–2 hrs.
 </div>
 
 <!-- FIRE RESOURCES SECTION -->
@@ -3017,7 +3017,7 @@ function onTokenInput(){
       const sp=document.getElementById('synopticPanel'); if(sp){sp.classList.remove('open');localStorage.setItem('bw_coll_synopticPanel','0');}
     } else {
       localStorage.removeItem(GLFF_TOKEN_KEY);
-      setTokenStatus('No token saved', '');
+      setTokenStatus('No token — airport weather used as fallback', '');
     }
   }, 600);
 }
@@ -3078,7 +3078,7 @@ function loadSavedToken(){
     input.classList.add('token-ok');
     setTokenStatus('Token loaded — press Test to verify', 'ok');
   } else {
-    setTokenStatus('No token saved', '');
+    setTokenStatus('No token — airport weather used as fallback', '');
   }
 }
 
@@ -9461,7 +9461,7 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
     if(!stations || stations.length === 0){
       renderGrid(
         openMeteoComps,
-        '📊 Model estimate (Open-Meteo noon) — add Synoptic token for real RAWS/ASOS data',
+        '📊 No nearby station data — FWI from Open-Meteo forecast model',
         'model'
       );
       return;
@@ -9539,7 +9539,7 @@ async function fetchRawsFWI(unitIdx, lat, lon, rxActive, openMeteoComps, chainSt
   if(!obsNearNoon){
     renderGrid(
       openMeteoComps,
-      '📡 ' + (chosen.NAME || stId) + ' · non-noon obs · reverting to forecast model FWI',
+      '📡 ' + (chosen.NAME || stId) + ' · obs outside 10am–4pm window (FWI needs near-noon reading) · using forecast model',
       'model'
     );
     return;
