@@ -9997,7 +9997,9 @@ function renderUnits(){
       </div>`;
     grid.appendChild(card);
 
-    // Fetch + render
+    // Fetch + render — stagger requests 300ms apart to avoid rate-limiting Open-Meteo
+    const _fetchDelay = cget(`wx8_${unit.lat}_${unit.lon}`) ? 0 : i * 300;
+    setTimeout(function(){
     Promise.all([
       fetchWeather(unit.lat, unit.lon),
       fetchAlerts(unit.lat, unit.lon),
@@ -10270,6 +10272,7 @@ function renderUnits(){
       summaries.push({idx:i,name:unit.name,verdict:'out'});
       if(summaries.length===units.length) renderSummary(summaries);
     });
+    }, _fetchDelay);
   });
 }
 
