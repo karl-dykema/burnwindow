@@ -467,6 +467,7 @@ body::before {
   font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
   padding: 6px 12px; background: none; border: 1px solid var(--border2); color: var(--muted);
   border-radius: 2px; cursor: pointer; transition: all .18s;
+  text-decoration: none; display: inline-block;
 }
 .fc-sbtn:hover { border-color: var(--amber); color: var(--amber); }
 .fc-sbtn.danger:hover { border-color: var(--out); color: var(--out); }
@@ -9992,11 +9993,11 @@ function renderUnits(){
       <div class="uc-foot">
         <span class="uc-foot-left">📍 ${unit.lat.toFixed(4)}, ${unit.lon.toFixed(4)}
           <button class="spot-wx-link" onclick="fetchSpotWx(${i})" title="Fetch NWS point forecast summary">📡 NWS Spot Wx</button>
-          <a class="spot-wx-link" href="https://app.watchduty.org/@${unit.lat.toFixed(4)},${unit.lon.toFixed(4)},12z" target="_blank" rel="noopener" title="Open in Watch Duty">🗺 Watch Duty</a>
         </span>
         <div class="uc-foot-right">
           <button class="fc-sbtn accent" onclick="openGNG(${i})" title="Go / No-Go Checklist">✔ Go/No-Go</button>
           <button class="fc-sbtn accent" onclick="openBurnLog(${i})" title="Burn Log">📒 Log</button>
+          <a class="fc-sbtn" href="https://app.watchduty.org/@${unit.lat.toFixed(4)},${unit.lon.toFixed(4)},12z" target="_blank" rel="noopener" title="Open in Watch Duty">🗺 Watch Duty</a>
           <button class="fc-sbtn" onclick="openModal(${i})">✎ Edit</button>
           <button class="fc-sbtn danger" onclick="delUnit(${i})">✕ Remove</button>
         </div>
