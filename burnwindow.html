@@ -1530,12 +1530,14 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
       <strong style="color:var(--text)">Free API key required:</strong>
       <a href="https://docs.airnowapi.org/account/request" target="_blank" style="color:#a070d0">docs.airnowapi.org/account/request</a>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:480px;">
       <input id="airnowTokenInput" type="text" class="mfi" placeholder="Paste AirNow API key here…"
-        style="flex:1;max-width:400px;font-size:13px;" value="">
-      <button class="tbar-btn primary" onclick="saveAirnowToken()" style="flex-shrink:0;">💾 Save Key</button>
-      <button class="tbar-btn" onclick="testAirnowToken()" style="flex-shrink:0;">✔ Test</button>
-      <span id="airnowTokenStatus" style="font-family:var(--mono);font-size:11px;color:var(--muted);min-width:120px;"></span>
+        style="width:100%;font-size:13px;" value="">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="tbar-btn primary" onclick="saveAirnowToken()" style="flex-shrink:0;">💾 Save Key</button>
+        <button class="tbar-btn" onclick="testAirnowToken()" style="flex-shrink:0;">✔ Test</button>
+        <span id="airnowTokenStatus" style="font-family:var(--mono);font-size:11px;color:var(--muted);"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -1555,14 +1557,16 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
         style="color:var(--amber2);">developers.synopticdata.com/signup</a>
       → create account → copy Public Token.
     </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:480px;">
       <input class="token-input" id="glffTokenInput" type="text"
         placeholder="Paste your Synoptic Public Token here…"
-        style="flex:1;min-width:220px;max-width:480px;"
+        style="width:100%;"
         oninput="onTokenInput()" />
-      <button class="tbar-btn" onclick="testGlffToken()" id="tokenTestBtn"
-        style="font-size:11px;padding:4px 12px;flex-shrink:0;">✓ Test Token</button>
-      <span class="token-status" id="tokenStatus">No token saved</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="tbar-btn" onclick="testGlffToken()" id="tokenTestBtn"
+          style="font-size:11px;padding:4px 12px;flex-shrink:0;">✓ Test Token</button>
+        <span class="token-status" id="tokenStatus">No token — airport weather used as fallback</span>
+      </div>
     </div>
   </div>
 </div>
