@@ -18,7 +18,7 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 - **Dead fuel moisture (NFDRS)** — 1-hr, 10-hr, 100-hr equilibrium moisture content
 - **Ventilation Index** — boundary layer height × transport wind
 - **AQI** — Air quality via AirNow API (requires free key)
-- **Nearby active fires** — NIFC incident detection with distance and acreage; wildfires and nearby prescribed burns (RX) shown separately
+- **Nearby active fires** — NIFC incident detection with distance and acreage; wildfires and nearby prescribed burns (RX) shown separately; each incident links directly to its location in [Watch Duty](https://app.watchduty.org)
 - **Station observations** — current weather from the nearest station, fetched in priority order: (1) Synoptic Data RAWS (free token optional — provides actual fire-weather stations); (2) NWS weather.gov ASOS airport observations (no key required, automatic fallback); (3) Open-Meteo forecast model as last resort. Observations outside the 10 AM–4 PM window revert to model values to maintain FWI accuracy.
 - **5-day forecast** — clickable forecast strip updates all FWI and FBP outputs for each forecast day
 - **Go/No-Go modal** — structured decision checklist with burn log
