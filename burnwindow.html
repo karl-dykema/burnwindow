@@ -1517,6 +1517,53 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
         Archive data: <a href="https://open-meteo.com" target="_blank" style="color:var(--amber2)">Open-Meteo /archive</a> (free, no key required).
       </div>
     </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--amber2);margin-bottom:6px;letter-spacing:.5px;">Dead Fuel Moisture — NFDRS Equilibrium (Nelson 1984)</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;">
+        Dead fuel moisture is estimated from the current temperature and RH using the
+        Nelson (1984) Equilibrium Moisture Content (EMC) equations, which are the foundation
+        of the US National Fire Danger Rating System (NFDRS) fuel moisture tables.<br><br>
+        EMC is computed in three RH ranges:<br>
+        &nbsp;RH &lt; 10%: <em>0.03229 + 0.281073·RH − 0.000578·T·RH</em><br>
+        &nbsp;10–50%: <em>2.22749 + 0.160107·RH − 0.01478·T</em><br>
+        &nbsp;&gt; 50%: <em>21.0606 + 0.005565·RH² − 0.00035·T·RH − 0.483199·RH</em><br>
+        where T is temperature in °F.<br><br>
+        Time-lag adjustments (Fosberg &amp; Deeming 1971) are then applied to approximate each size class:<br>
+        &nbsp;<strong style="color:var(--text)">1-hr</strong> = EMC (fine fuels equilibrate within one hour)<br>
+        &nbsp;<strong style="color:var(--text)">10-hr</strong> = EMC × 1.18 + 1.5 (small roundwood, ~1 in diameter)<br>
+        &nbsp;<strong style="color:var(--text)">100-hr</strong> = EMC × 1.45 + 3.0 (medium roundwood, ~3 in diameter)<br><br>
+        <strong style="color:var(--text)">Limitation:</strong> These are equilibrium (point-in-time) estimates.
+        The full NFDRS model steps 10-hr and 100-hr moisture forward from yesterday's value toward today's EMC
+        at a rate of ~91%/day (10-hr) and ~21%/day (100-hr), giving the heavier classes a memory of recent
+        weather history. That lagged chain is not yet implemented — it would be most impactful for 100-hr
+        during drought recovery or after heavy rain.
+      </div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--amber2);margin-bottom:6px;letter-spacing:.5px;">KBDI — Keetch-Byram Drought Index (Keetch &amp; Byram 1968)</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;">
+        KBDI (0 = saturated, 800 = extreme drought) represents the net effect of
+        evapotranspiration and precipitation on soil/duff moisture deficit.<br><br>
+        Each day, drying is estimated from maximum temperature and mean annual precipitation (MAP):<br>
+        <em>dQ = [(800−Q)·(0.968·e^(0.0486·Tmax)−8.30)] / [1+10.88·e^(−0.0441·MAP)] × 0.001</em><br><br>
+        Precipitation recharge: any daily total above 0.2 in subtracts 100× the excess
+        (the first 0.2 in is assumed intercepted by the canopy).<br><br>
+        BurnWindow steps KBDI forward through the 7-day Open-Meteo forecast
+        and persists the running value in localStorage, so the index accumulates
+        realistic history across page loads rather than resetting each visit.<br><br>
+        <strong style="color:var(--text)">Interpretation:</strong> 0–200 = low drought stress; 200–400 = moderate;
+        400–600 = high; 600–800 = extreme. Values above 400 indicate deep duff and
+        mineral soil moisture deficits relevant to sustained burning and mop-up difficulty.
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+        Sources: Nelson, R.M. (1984). <em>A method for describing equilibrium moisture content of forest fuels.</em>
+        Can. J. For. Res. 14:597–600. &nbsp;|&nbsp;
+        Fosberg, M.A. &amp; Deeming, J.E. (1971). <em>Derivation of the 1- and 10-hour timelag fuel moisture calculations for fire-danger rating.</em> USDA Forest Service Research Note RM-207. &nbsp;|&nbsp;
+        Keetch, J.J. &amp; Byram, G.M. (1968). <em>A Drought Index for Forest Fire Control.</em> USDA Forest Service Research Paper SE-38.
+      </div>
+    </div>
   </div></div>
 </div>
 
@@ -1741,13 +1788,6 @@ const wxEmoji=c=>{if(c==0)return'☀️';if(c<=2)return'🌤️';if(c<=3)return'
 // ═══ UNITS DATA ══════════════════════════════════════════════════════════
 let editIdx=-1;
 let units=JSON.parse(localStorage.getItem('bw_units')||'null')||[
-  {
-    name:'Galveston Bay — Fire & RX Test',
-    lat:29.623611, lon:-94.561111,
-    acres:null, lastBurn:null,
-    habitat:'Test unit — Gulf Coast area with active NIFC wildfire and prescribed burn (RX) detections nearby. Use to verify nearby fire banners.',
-    dirOverride:null
-  },
   {
     name:'TX Panhandle — Dry Reference',
     lat:35.1983, lon:-101.8313,
