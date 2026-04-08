@@ -1534,11 +1534,14 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
         &nbsp;<strong style="color:var(--text)">1-hr</strong> = EMC (fine fuels equilibrate within one hour)<br>
         &nbsp;<strong style="color:var(--text)">10-hr</strong> = EMC × 1.18 + 1.5 (small roundwood, ~1 in diameter)<br>
         &nbsp;<strong style="color:var(--text)">100-hr</strong> = EMC × 1.45 + 3.0 (medium roundwood, ~3 in diameter)<br><br>
-        <strong style="color:var(--text)">Limitation:</strong> These are equilibrium (point-in-time) estimates.
-        The full NFDRS model steps 10-hr and 100-hr moisture forward from yesterday's value toward today's EMC
-        at a rate of ~91%/day (10-hr) and ~21%/day (100-hr), giving the heavier classes a memory of recent
-        weather history. That lagged chain is not yet implemented — it would be most impactful for 100-hr
-        during drought recovery or after heavy rain.
+        The 1-hr class equilibrates within an hour — pure EMC is the correct model and no lag is needed.<br><br>
+        The 10-hr and 100-hr classes use the same 60-day historical weather chain as the FWI system.
+        Each day the chain steps forward:<br>
+        <em>fm_today = EMC + (fm_yesterday − EMC) × e^(−24/τ)</em><br>
+        where τ is 10 or 100 hours. After the 60-day run, both classes have fully converged —
+        starting values are irrelevant. The 100-hr is most meaningful during drought recovery
+        (slow to dry down) or after heavy rain (slow to absorb moisture), when it diverges
+        significantly from a simple EMC estimate.
       </div>
     </div>
     <div>
@@ -1899,7 +1902,7 @@ function cclear(){
   // Clear RAWS and AQI caches (own prefixes, 30-min TTL)
   Object.keys(localStorage).filter(k=>k.startsWith('bw_aqi_')||k.startsWith('bwc2_raws_')||k.endsWith('_raw')).forEach(k=>localStorage.removeItem(k));
   // Clear FWI chain and KBDI caches so they recompute from fresh historical data
-  Object.keys(localStorage).filter(k=>k.startsWith('bw_fwichain_')||k.startsWith('bw_kbdi_')).forEach(k=>localStorage.removeItem(k));
+  Object.keys(localStorage).filter(k=>k.startsWith('bw_fwichain2_')||k.startsWith('bw_kbdi_')).forEach(k=>localStorage.removeItem(k));
 }
 
 // ═══ API CALLS ════════════════════════════════════════════════════════════
@@ -2394,10 +2397,10 @@ function computeFWI(tC, rh, windKmh, precipMm, chainState){
 //
 // The archive API is free, requires no key, and shares the same CDN as the
 // forecast endpoint. One archive call per unit per day; result cached in
-// localStorage key bw_fwichain_{lat}_{lon}.
+// localStorage key bw_fwichain2_{lat}_{lon}.
 
 function fwiChainKey(lat, lon){
-  return 'bw_fwichain_' + Math.round(lat * 1000) + '_' + Math.round(lon * 1000);
+  return 'bw_fwichain2_' + Math.round(lat * 1000) + '_' + Math.round(lon * 1000);
 }
 
 // fetchFWIChain — walks FFMC/DMC/DC chain from historical weather data.
@@ -2414,15 +2417,17 @@ function fetchFWIChain(lat, lon, wxData){
   if(stored && stored.date === today) return stored;
 
   // Seed values
-  let startFFMC = stored?.ffmc ?? 85;
-  let startDMC  = stored?.dmc  ?? 6;
-  let startDC   = stored?.dc   ?? 15;
+  let startFFMC  = stored?.ffmc      ?? 85;
+  let startDMC   = stored?.dmc       ?? 6;
+  let startDC    = stored?.dc        ?? 15;
+  let startFm10  = stored?.fm10_chain  ?? 15;  // converges within 1-2 days regardless of start
+  let startFm100 = stored?.fm100_chain ?? 20;  // converges within ~12 days; 60-day chain is plenty
 
   // Use wx.daily if available (main forecast fetch now includes past_days=60)
   // This eliminates the second API call entirely.
   const D = wxData?.daily;
   if(D && D.time && D.time.length){
-    return _walkChain(D, startFFMC, startDMC, startDC, stored, key, today);
+    return _walkChain(D, startFFMC, startDMC, startDC, startFm10, startFm100, stored, key, today);
   }
 
   // Fallback: no wxData yet — return stored (or null to use startup defaults).
@@ -2432,18 +2437,25 @@ function fetchFWIChain(lat, lon, wxData){
   return stored;
 }
 
-// _walkChain — internal: steps FFMC/DMC/DC through all historical days in D.
-function _walkChain(D, startFFMC, startDMC, startDC, stored, key, today){
+// Exponential lag factors for NFDRS dead fuel moisture (Fosberg & Deeming 1971)
+// fm_today = EMC + (fm_yesterday - EMC) * LAG_factor
+const FM_LAG10  = Math.exp(-24 / 10);   // 0.0907 — 10-hr (nearly at EMC after 1 day)
+const FM_LAG100 = Math.exp(-24 / 100);  // 0.7866 — 100-hr (slow; multi-day memory)
+
+// _walkChain — internal: steps FFMC/DMC/DC + lagged fm10/fm100 through all historical days in D.
+function _walkChain(D, startFFMC, startDMC, startDC, startFm10, startFm100, stored, key, today){
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().split('T')[0];
 
   let ffmc = startFFMC, dmc = startDMC, dc = startDC;
+  let fm10 = startFm10, fm100 = startFm100;
   let daysWalked = 0;
   for(let i = 0; i < D.time.length; i++){
     const dt = D.time[i];
     if(stored && dt <= stored.date) continue; // already processed
     if(dt > yesterdayStr) break;              // stop before today's forecast day
-    const tC      = ((D.temperature_2m_max?.[i] ?? 60) - 32) * 5 / 9;
+    const tF      = D.temperature_2m_max?.[i] ?? 60;  // already °F (Open-Meteo requested in fahrenheit)
+    const tC      = (tF - 32) * 5 / 9;
     // Van Wagner (1987) specifies noon RH; daily min RH is the closest proxy
     // (occurs near afternoon temp peak). Fall back to mean if min unavailable.
     const rh      = D.relative_humidity_2m_min?.[i] ?? D.relative_humidity_2m_mean?.[i] ?? 60;
@@ -2453,6 +2465,10 @@ function _walkChain(D, startFFMC, startDMC, startDC, stored, key, today){
     ffmc = stepFFMC(ffmc, tC, rh, windKmh, precipMm);
     dmc  = stepDMC(dmc,  tC, rh, precipMm, month);
     dc   = stepDC(dc,   tC, precipMm, month);
+    // NFDRS lagged fuel moisture (Fosberg & Deeming 1971)
+    const emc = Math.max(1, computeEMC(rh, tF));
+    fm10  = emc + (fm10  - emc) * FM_LAG10;
+    fm100 = emc + (fm100 - emc) * FM_LAG100;
     daysWalked++;
   }
 
@@ -2465,6 +2481,8 @@ function _walkChain(D, startFFMC, startDMC, startDC, stored, key, today){
     dmc:  Math.round(dmc  * 10) / 10,
     dc:   Math.round(dc   * 10) / 10,
     days: (stored?.days ?? 0) + daysWalked,
+    fm10_chain:  Math.round(Math.max(2,  Math.min(35, fm10))  * 10) / 10,
+    fm100_chain: Math.round(Math.max(4,  Math.min(30, fm100)) * 10) / 10,
   };
   try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){}
   return state;
@@ -9894,8 +9912,15 @@ function refreshUnitRx(idx){
       ? (curGust > rxActive.gustMax ? 'bad' : curGust > rxActive.gustMax * 0.87 ? 'warn' : 'good')
       : 'good';
 
-    // Fuel moisture from current conditions
-    const curFM  = computeFuelMoisture(cur.temperature_2m, cur.relative_humidity_2m);
+    // Fuel moisture — 1-hr is pure EMC (equilibrates in <1 hr, no lag needed).
+    // 10-hr and 100-hr use the lagged chain from _walkChain when available,
+    // falling back to EMC estimates if the chain hasn't run yet.
+    const _emcFM = computeFuelMoisture(cur.temperature_2m, cur.relative_humidity_2m);
+    const curFM = {
+      fm1:   _emcFM.fm1,
+      fm10:  chainState?.fm10_chain  ?? _emcFM.fm10,
+      fm100: chainState?.fm100_chain ?? _emcFM.fm100,
+    };
     const fm1Cls = fmClass(curFM.fm1,  'fm1');
     const fm10Cls= fmClass(curFM.fm10, 'fm10');
     const fm100Cls=fmClass(curFM.fm100,'fm100');
@@ -9938,10 +9963,10 @@ function refreshUnitRx(idx){
         + '<div class="fuels-cell ' + fm1Cls.cls + '" title="1-hr Fuel Moisture — dead fine fuels (grass, pine needles). Responds within 1 hour to RH/temp changes.">'
         + '<span class="fuels-lbl">1-hr</span><span class="fuels-val">' + curFM.fm1 + '%</span><span class="fuels-cls">' + fm1Cls.lbl + '</span></div>'
         // 10hr FM
-        + '<div class="fuels-cell ' + fm10Cls.cls + '" title="10-hr Fuel Moisture — small woody debris up to 0.25 inch diameter. Lags 10 hours behind conditions.">'
+        + '<div class="fuels-cell ' + fm10Cls.cls + '" title="10-hr Fuel Moisture — small woody debris (~1 in diameter). Stepped daily via NFDRS exponential lag (Fosberg &amp; Deeming 1971) using 60-day weather history.">'
         + '<span class="fuels-lbl">10-hr</span><span class="fuels-val">' + curFM.fm10 + '%</span><span class="fuels-cls">' + fm10Cls.lbl + '</span></div>'
         // 100hr FM
-        + '<div class="fuels-cell ' + fm100Cls.cls + '" title="100-hr Fuel Moisture — larger dead wood, 0.25–1 inch diameter. Multi-day lag from ambient conditions.">'
+        + '<div class="fuels-cell ' + fm100Cls.cls + '" title="100-hr Fuel Moisture — larger dead wood (~3 in diameter). Stepped daily via NFDRS exponential lag using 60-day weather history. Most impactful during drought recovery or after rain.">'
         + '<span class="fuels-lbl">100-hr</span><span class="fuels-val">' + curFM.fm100 + '%</span><span class="fuels-cls">' + fm100Cls.lbl + '</span></div>'
         // KBDI
         + '<div class="fuels-cell ' + kbdiCls.cls + ' ' + kbdiStatus + '" title="Keetch-Byram Drought Index (0=saturated, 800=extreme drought). Reflects deep soil/duff moisture. Computed from daily Open-Meteo data.">'
@@ -11112,8 +11137,8 @@ function refreshNetworkPanel(){
   const alertAge  = cacheAge('bwc2_alt_');
   const rawsAge   = cacheAge('bwc2_raws_');
   const aqiAge    = cacheAge('bw_aqi_');
-  const chainKeys = Object.keys(localStorage).filter(k => k.startsWith('bw_fwichain_'));
-  const chainAge  = chainKeys.length ? cacheAge('bw_fwichain_') : null;
+  const chainKeys = Object.keys(localStorage).filter(k => k.startsWith('bw_fwichain2_'));
+  const chainAge  = chainKeys.length ? cacheAge('bw_fwichain2_') : null;
 
   // ── Payload estimates (KB, pre-gzip) ───────────────────────────────────
   // Open-Meteo 7-day, 8 hourly vars + 8 daily vars
