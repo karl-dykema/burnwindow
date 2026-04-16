@@ -1,5 +1,5 @@
 # 🔥 BurnWindow
-**Prescribed Fire Decision Dashboard** · v1.0.2
+**Prescribed Fire Decision Dashboard** · v1.0.3
 
 BurnWindow is an open-source, browser-based go/no-go decision support tool for prescribed fire managers. It integrates real-time weather forecasts, the Canadian Fire Weather Index (FWI) system, CFFDRS Fire Behavior Prediction (FBP), drought indices, air quality, and nearby active fire detection into a single field-ready dashboard — with no server, no login, and no installation required.
 
