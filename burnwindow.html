@@ -401,7 +401,7 @@ body::before {
 .cond-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .cond-cell {
   background: var(--bg); border: 1px solid var(--border); border-radius: 2px;
-  padding: 11px 12px; position: relative; overflow: hidden;
+  padding: 8px 10px; position: relative; overflow: hidden;
 }
 .cond-cell.good { border-color: rgba(94,184,94,.2); }
 .cond-cell.warn { border-color: rgba(200,148,32,.25); }
@@ -413,9 +413,9 @@ body::before {
 .cond-cell.warn::before { background: var(--marginal); }
 .cond-cell.bad::before  { background: var(--out); }
 .cond-cell.na::before   { background: var(--border2); }
-.cc-label { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
-.cc-value { font-family: var(--mono); font-size: 21px; color: var(--text); font-weight: 500; }
-.cc-thresh { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
+.cc-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-value { font-family: var(--mono); font-size: 18px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-thresh { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ═══ ALERT BANNER ═══════════════════════════════════════════════════════ */
 .alert-banner {
@@ -1046,9 +1046,9 @@ body::before {
   .cond-cell.good::before { background: #1a7a1a !important; }
   .cond-cell.warn::before { background: #7a6000 !important; }
   .cond-cell.bad::before  { background: #8a1a1a !important; }
-  .cc-label { font-size: 8px !important; color: #555 !important; }
-  .cc-value { font-size: 13px !important; color: #111 !important; }
-  .cc-thresh{ font-size: 8px !important; color: #777 !important; }
+  .cc-label { font-size: 7px !important; color: #555 !important; }
+  .cc-value { font-size: 12px !important; color: #111 !important; }
+  .cc-thresh{ font-size: 7px !important; color: #777 !important; }
 
   /* ── Alert banners ── */
   .alert-banner { font-size: 10px !important; padding: 5px 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -3055,14 +3055,14 @@ function selectForecastDay(unitIdx, fi){
       const windKmhN = mphToKmh(wind);
       const fwiComps = computeFWI(tCN, rh, windKmhN, 0, wxStore[unitIdx]?.chainState);
       const cells2=[
-        {label:'RH (noon)',     value:Math.round(rh)+'%',           thresh:rx.rhMin+'–'+rx.rhMax+'%',        status:condStatusFor(rh,rx.rhMin,rx.rhMax)},
-        {label:'Wind (noon)',   value:Math.round(wind)+' mph',       thresh:rx.windMin+'–'+rx.windMax+' mph', status:condStatusFor(wind,rx.windMin,rx.windMax)},
-        {label:'Wind Gust',     value:gustN!=null?Math.round(gustN)+' mph':'—', thresh:rx.gustMax?'<'+rx.gustMax+' mph':'no limit', status:gustStatus},
-        {label:'Wind Dir',      value:dir,                           thresh:rxDirs.length?rxDirs.join(' ')+'✓':'any', status:dirOk?'good':'bad'},
-        {label:'Temp (noon)',   value:Math.round(temp)+'°F',         thresh:'>'+rx.tempMin+'°F',              status:condStatusFor(temp,rx.tempMin,null)},
-        {label:'Precip Prob',   value:precip+'%',                    thresh:'<'+rx.precipMax+'%',             status:condStatusFor(precip,null,rx.precipMax)},
-        {label:'Ventilation',   value:viN.label,                     thresh:viN.vi.toLocaleString()+' m²/s',  status:viN.cls==='vi-good'?'good':viN.cls==='vi-marginal'?'warn':'bad'},
-        {label:'Noon Overall',  value:fv==='in'?'✓ IN RX':fv==='marginal'?'~ MARGINAL':'✕ OUT', thresh:'noon est.', status:fv==='in'?'good':fv==='marginal'?'warn':'bad'},
+        {label:'RH',        value:Math.round(rh)+'%',           thresh:rx.rhMin+'–'+rx.rhMax+'%',        status:condStatusFor(rh,rx.rhMin,rx.rhMax)},
+        {label:'Wind',      value:Math.round(wind)+' mph',       thresh:rx.windMin+'–'+rx.windMax+' mph', status:condStatusFor(wind,rx.windMin,rx.windMax)},
+        {label:'Gust',      value:gustN!=null?Math.round(gustN)+' mph':'—', thresh:rx.gustMax?'<'+rx.gustMax+' mph':'no limit', status:gustStatus},
+        {label:'Dir',       value:dir,                           thresh:rxDirs.length?rxDirs.join(' ')+'✓':'any', status:dirOk?'good':'bad'},
+        {label:'Temp',      value:Math.round(temp)+'°F',         thresh:'>'+rx.tempMin+'°F',              status:condStatusFor(temp,rx.tempMin,null)},
+        {label:'Precip',    value:precip+'%',                    thresh:'<'+rx.precipMax+'%',             status:condStatusFor(precip,null,rx.precipMax)},
+        {label:'Vent',      value:viN.label,                     thresh:viN.vi.toLocaleString()+' m²/s',  status:viN.cls==='vi-good'?'good':viN.cls==='vi-marginal'?'warn':'bad'},
+        {label:'Overall',   value:fv==='in'?'IN RX':fv==='marginal'?'MARGINAL':'OUT', thresh:'noon est.', status:fv==='in'?'good':fv==='marginal'?'warn':'bad'},
       ];
       cg.style.gridTemplateColumns='repeat(4,1fr)';
       cg.innerHTML=cells2.map(c=>`<div class="cond-cell ${c.status}"><div class="cc-label">${c.label}</div><div class="cc-value">${c.value}</div><div class="cc-thresh">${c.thresh}</div></div>`).join('');
@@ -10068,14 +10068,14 @@ function refreshUnitRx(idx){
       : 'good';
 
     const cells2 = [
-      {label:'Rel. Humidity', value:Math.round(cur.relative_humidity_2m)+'%',    thresh:rxActive.rhMin+'–'+rxActive.rhMax+'%',     status:condStatusFor(cur.relative_humidity_2m, rxActive.rhMin, rxActive.rhMax)},
-      {label:'Wind Speed',    value:Math.round(cur.wind_speed_10m)+' mph',        thresh:rxActive.windMin+'–'+rxActive.windMax+' mph', status:condStatusFor(cur.wind_speed_10m, rxActive.windMin, rxActive.windMax)},
-      {label:'Wind Gust',     value:curGust!=null?Math.round(curGust)+' mph':'—', thresh:rxActive.gustMax?'<'+rxActive.gustMax+' mph':'no limit', status:gustStatus},
-      {label:'Wind Dir',      value:dir,                                           thresh:rxDirs.length ? rxDirs.join(' ')+'✓' : 'any',  status:dirOk?'good':'bad'},
-      {label:'Temperature',   value:Math.round(cur.temperature_2m)+'°F',           thresh:'>'+rxActive.tempMin+'°F',                 status:condStatusFor(cur.temperature_2m, rxActive.tempMin, null)},
-      {label:'Precip Prob',   value:cur.precipitation_probability+'%',             thresh:'<'+rxActive.precipMax+'%',                status:condStatusFor(cur.precipitation_probability, null, rxActive.precipMax)},
-      {label:'Ventilation',   value:viData.label,                                  thresh:viData.vi.toLocaleString()+' m²/s',         status:viData.cls==='vi-good'?'good':viData.cls==='vi-marginal'?'warn':'bad'},
-      {label:'Overall',       value:verdict==='in'?'✓ IN RX':verdict==='marginal'?'~ MARGINAL':'✕ OUT', thresh:'current', status:verdict==='in'?'good':verdict==='marginal'?'warn':'bad'},
+      {label:'RH',         value:Math.round(cur.relative_humidity_2m)+'%',    thresh:rxActive.rhMin+'–'+rxActive.rhMax+'%',     status:condStatusFor(cur.relative_humidity_2m, rxActive.rhMin, rxActive.rhMax)},
+      {label:'Wind',       value:Math.round(cur.wind_speed_10m)+' mph',        thresh:rxActive.windMin+'–'+rxActive.windMax+' mph', status:condStatusFor(cur.wind_speed_10m, rxActive.windMin, rxActive.windMax)},
+      {label:'Gust',       value:curGust!=null?Math.round(curGust)+' mph':'—', thresh:rxActive.gustMax?'<'+rxActive.gustMax+' mph':'no limit', status:gustStatus},
+      {label:'Dir',        value:dir,                                           thresh:rxDirs.length ? rxDirs.join(' ')+'✓' : 'any',  status:dirOk?'good':'bad'},
+      {label:'Temp',       value:Math.round(cur.temperature_2m)+'°F',           thresh:'>'+rxActive.tempMin+'°F',                 status:condStatusFor(cur.temperature_2m, rxActive.tempMin, null)},
+      {label:'Precip',     value:cur.precipitation_probability+'%',             thresh:'<'+rxActive.precipMax+'%',                status:condStatusFor(cur.precipitation_probability, null, rxActive.precipMax)},
+      {label:'Vent',       value:viData.label,                                  thresh:viData.vi.toLocaleString()+' m²/s',         status:viData.cls==='vi-good'?'good':viData.cls==='vi-marginal'?'warn':'bad'},
+      {label:'Overall',    value:verdict==='in'?'IN RX':verdict==='marginal'?'MARGINAL':'OUT', thresh:'current', status:verdict==='in'?'good':verdict==='marginal'?'warn':'bad'},
     ];
     // Update conditions grid to 4-col for 8 cells
     cg.style.gridTemplateColumns = 'repeat(4, 1fr)';
@@ -10386,14 +10386,14 @@ function renderUnits(){
           :'good';
 
         const cells2=[
-          {label:'Rel. Humidity', value:Math.round(cur.relative_humidity_2m)+'%',    thresh:rxActive.rhMin+'–'+rxActive.rhMax+'%',       status:condStatusFor(cur.relative_humidity_2m,rxActive.rhMin,rxActive.rhMax)},
-          {label:'Wind Speed',    value:Math.round(cur.wind_speed_10m)+' mph',        thresh:rxActive.windMin+'–'+rxActive.windMax+' mph', status:condStatusFor(cur.wind_speed_10m,rxActive.windMin,rxActive.windMax)},
-          {label:'Wind Gust',     value:curGust!=null?Math.round(curGust)+' mph':'—', thresh:rxActive.gustMax?'<'+rxActive.gustMax+' mph':'no limit', status:gustStatus},
-          {label:'Wind Dir',      value:dir, thresh:rxDirs.length?rxDirs.join(' ')+'✓':'any', status:dirOk?'good':'bad'},
-          {label:'Temperature',   value:Math.round(cur.temperature_2m)+'°F',          thresh:'>'+rxActive.tempMin+'°F',                   status:condStatusFor(cur.temperature_2m,rxActive.tempMin,null)},
-          {label:'Precip Prob',   value:cur.precipitation_probability+'%',            thresh:'<'+rxActive.precipMax+'%',                  status:condStatusFor(cur.precipitation_probability,null,rxActive.precipMax)},
-          {label:'Ventilation',   value:viData.label, thresh:viData.vi.toLocaleString()+' m²/s', status:viData.cls==='vi-good'?'good':viData.cls==='vi-marginal'?'warn':'bad'},
-          {label:'Overall',       value:verdict==='in'?'✓ IN RX':verdict==='marginal'?'~ MARGINAL':'✕ OUT', thresh:'current', status:verdict==='in'?'good':verdict==='marginal'?'warn':'bad'},
+          {label:'RH',         value:Math.round(cur.relative_humidity_2m)+'%',    thresh:rxActive.rhMin+'–'+rxActive.rhMax+'%',       status:condStatusFor(cur.relative_humidity_2m,rxActive.rhMin,rxActive.rhMax)},
+          {label:'Wind',       value:Math.round(cur.wind_speed_10m)+' mph',        thresh:rxActive.windMin+'–'+rxActive.windMax+' mph', status:condStatusFor(cur.wind_speed_10m,rxActive.windMin,rxActive.windMax)},
+          {label:'Gust',       value:curGust!=null?Math.round(curGust)+' mph':'—', thresh:rxActive.gustMax?'<'+rxActive.gustMax+' mph':'no limit', status:gustStatus},
+          {label:'Dir',        value:dir, thresh:rxDirs.length?rxDirs.join(' ')+'✓':'any', status:dirOk?'good':'bad'},
+          {label:'Temp',       value:Math.round(cur.temperature_2m)+'°F',          thresh:'>'+rxActive.tempMin+'°F',                   status:condStatusFor(cur.temperature_2m,rxActive.tempMin,null)},
+          {label:'Precip',     value:cur.precipitation_probability+'%',            thresh:'<'+rxActive.precipMax+'%',                  status:condStatusFor(cur.precipitation_probability,null,rxActive.precipMax)},
+          {label:'Vent',       value:viData.label, thresh:viData.vi.toLocaleString()+' m²/s', status:viData.cls==='vi-good'?'good':viData.cls==='vi-marginal'?'warn':'bad'},
+          {label:'Overall',    value:verdict==='in'?'IN RX':verdict==='marginal'?'MARGINAL':'OUT', thresh:'current', status:verdict==='in'?'good':verdict==='marginal'?'warn':'bad'},
         ];
         cg.style.gridTemplateColumns='repeat(4,1fr)';
         cg.innerHTML=cells2.map(c=>
