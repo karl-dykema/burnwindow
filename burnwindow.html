@@ -310,7 +310,7 @@ body::before {
   letter-spacing: 1.5px; text-transform: uppercase; color: var(--text);
   width: 100%; white-space: normal; word-break: break-word; line-height: 1.2;
 }
-.uc-details { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; min-height: 52px; align-content: flex-start; }
+.uc-details { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; align-content: flex-start; }
 .uc-tag {
   font-family: var(--mono); font-size: 12px; color: var(--muted);
   background: var(--bg); border: 1px solid var(--border); padding: 4px 9px; border-radius: 2px;
@@ -608,11 +608,17 @@ body::before {
 .fwi-source.warn  { color: rgba(200,148,32,.7); }
 
 /* Four-component FWI stat boxes — vertical layout: key / number / class */
-/* FWI 2-column primary layout */
-.fwi-grid-2 {
-  grid-template-columns: repeat(2, 1fr) !important;
+/* FWI column layout variants */
+.fwi-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
+.fwi-grid-3 { grid-template-columns: repeat(3, 1fr) !important; }
+/* Section collapse toggle */
+.fwi-section-toggle {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  cursor: pointer; padding: 2px 0 4px;
+  letter-spacing: .4px; transition: color .2s; user-select: none;
 }
-/* ISI/BUI expand toggle */
+.fwi-section-toggle:hover { color: var(--amber2); }
+/* Legacy details row (kept for backwards compat) */
 .fwi-details-toggle {
   font-family: var(--mono); font-size: 12px; color: var(--muted);
   cursor: pointer; padding: 4px 0 2px;
@@ -655,8 +661,8 @@ body::before {
 }
 .fwi-stat {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 14px 8px 12px; border: 1px solid; border-radius: 2px;
-  min-width: 0; gap: 4px; cursor: default;
+  padding: 10px 6px 8px; border: 1px solid; border-radius: 2px;
+  min-width: 0; gap: 3px; cursor: default;
 }
 /* Acronym label at top */
 .fwi-stat-key {
@@ -665,8 +671,8 @@ body::before {
 }
 /* The actual numeric value — large and prominent */
 .fwi-stat-val {
-  font-family: var(--mono); font-size: 30px; font-weight: 700;
-  line-height: 1.05; letter-spacing: -1px;
+  font-family: var(--mono); font-size: 22px; font-weight: 700;
+  line-height: 1.05; letter-spacing: -.5px;
 }
 /* Danger class label below */
 .fwi-stat-cls {
@@ -9825,10 +9831,10 @@ function buildFwiGridHTML(comps, rxActive, unitIdx, dayLabel){
       + '</div>';
   }
 
-  const fc  = fwiClass(comps.fwi);
-  const fc2 = ffmcClass(comps.ffmc);
-  const ic  = isiClass(comps.isi);
-  const bc  = buiClass(comps.bui);
+  const fc    = fwiClass(comps.fwi);
+  const fc2   = ffmcClass(comps.ffmc);
+  const ic    = isiClass(comps.isi);
+  const bc    = buiClass(comps.bui);
   const dmc_c = dmcClass(comps.dmc ?? 6);
   const dc_c  = dcClass(comps.dc ?? 15);
 
@@ -9842,24 +9848,28 @@ function buildFwiGridHTML(comps, rxActive, unitIdx, dayLabel){
   const isiOob  = oob(comps.isi,  rxActive.isiMax);
   const buiOob  = oob(comps.bui,  rxActive.buiMax);
 
-  const anyOob = fwiOob || ffmcOob || isiOob || buiOob;
+  const anyOob  = fwiOob || ffmcOob || isiOob || buiOob;
 
-  // Primary 2-badge row: FWI + FFMC
-  const toggleId = 'fwiDet' + unitIdx;
-  let html = '<div style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em;margin-bottom:4px;text-transform:uppercase;">Canadian Fire Weather Index</div>';
-  html += '<div class="fwi-grid fwi-grid-2">';
+  // Collapse by default; auto-expand when any component is out of Rx
+  const secId  = 'fwiSec' + unitIdx;
+  const togId  = secId + 'Tog';
+  const isOpen = anyOob;
+  const oobWarn = anyOob ? ' <span style="color:var(--out)">⚠</span>' : '';
+
+  let html = '<div class="fwi-section-toggle" id="' + togId + '" '
+    + 'onclick="toggleFwiSection(\'' + secId + '\')" '
+    + 'title="Expand/collapse Canadian Fire Weather Index">'
+    + (isOpen ? '▾' : '▸') + ' Canadian FWI'
+    + '  ·  ' + comps.fwi + ' <span style="opacity:.6">' + fc.label + '</span>'
+    + '  ·  FFMC ' + comps.ffmc + ' <span style="opacity:.6">' + fc2.label + '</span>'
+    + oobWarn + '</div>';
+
+  html += '<div id="' + secId + '" style="display:' + (isOpen ? '' : 'none') + ';margin-top:5px;">';
+  html += '<div class="fwi-grid fwi-grid-3">';
   html += statBox('FWI',  comps.fwi,  fwiOob  ? 'fwi-extreme' : fc.cls,  fc.label,
     'Canadian Fire Weather Index — overall danger combining fuel moisture and fire behavior.' + dl + fwiRxNote, fwiOob);
   html += statBox('FFMC', comps.ffmc, ffmcOob ? 'fwi-extreme' : fc2.cls, fc2.label,
     'Fine Fuel Moisture Code — surface litter/grass moisture. >85 ignition easy, >92 extreme.' + dl + ffmcRxNote, ffmcOob);
-  html += '</div>';
-
-  // Details toggle — ISI / BUI / DMC / DC shown on expand
-  const detWarn = (isiOob || buiOob) ? ' <span style="color:var(--out)">⚠</span>' : '';
-  html += '<div class="fwi-details-toggle" onclick="toggleFwiDetails(\'' + toggleId + '\')" title="Show/hide ISI, BUI, DMC, and DC components">'
-    + '▸ ISI ' + comps.isi + ' · BUI ' + comps.bui + ' · DMC ' + (comps.dmc ?? '—') + ' · DC ' + (comps.dc ?? '—') + detWarn + '</div>';
-  html += '<div class="fwi-details-row" id="' + toggleId + '" style="display:none;">';
-  html += '<div class="fwi-grid fwi-grid-2">';
   html += statBox('ISI',  comps.isi,  isiOob  ? 'fwi-extreme' : ic.cls,  ic.label,
     'Initial Spread Index — fire spread rate from FFMC + wind. >10 rapid spread.' + dl + isiRxNote, isiOob);
   html += statBox('BUI',  comps.bui,  buiOob  ? 'fwi-extreme' : bc.cls,  bc.label,
@@ -9871,6 +9881,15 @@ function buildFwiGridHTML(comps, rxActive, unitIdx, dayLabel){
   html += '</div></div>';
 
   return { html, anyOob };
+}
+
+function toggleFwiSection(secId){
+  const sec = document.getElementById(secId);
+  const tog = document.getElementById(secId + 'Tog');
+  if(!sec || !tog) return;
+  const opening = sec.style.display === 'none';
+  sec.style.display = opening ? '' : 'none';
+  tog.innerHTML = tog.innerHTML.replace(opening ? '▸' : '▾', opening ? '▾' : '▸');
 }
 
 // Toggle the ISI/BUI detail expand for a given card
