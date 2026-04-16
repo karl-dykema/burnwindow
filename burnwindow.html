@@ -1425,51 +1425,6 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
   </div>
 </div>
 
-<!-- SIMULTANEOUS WINDOW — stacked per-unit bars + intersection row -->
-<div id="simWin" style="display:none;margin-bottom:20px;">
-  <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--amber);border-radius:3px;padding:12px 16px;">
-
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;flex-wrap:wrap;gap:6px;cursor:pointer;" onclick="toggleSimWin()">
-      <span style="font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--amber)">⚡ 24-Hour Window — All Units — click to expand</span>
-      <div style="display:flex;align-items:center;gap:12px;">
-      <div class="hourly-legend">
-        <div class="hl-item"><div class="hl-dot in"></div>In Rx</div>
-        <div class="hl-item"><div class="hl-dot marginal"></div>Marginal</div>
-        <div class="hl-item"><div class="hl-dot out"></div>Out</div>
-      </div>
-      <span id="simWinChevron" style="font-family:var(--mono);font-size:11px;color:var(--muted);">▶ Show</span>
-      </div>
-    </div>
-
-    <!-- Collapsible body -->
-    <div id="simWinBody" style="display:none;margin-top:12px;">
-
-    <!-- Per-unit stacked bars — populated by renderSimWindow() -->
-    <div id="simRows"></div>
-
-    <!-- Shared intersection row -->
-    <div style="margin-top:6px;padding-top:8px;border-top:1px solid var(--border);">
-      <div class="sim-row-label" style="color:var(--amber2);font-weight:600;">⚡ All Units</div>
-      <div class="hourly-bar" id="simBar"></div>
-      <div id="simLbl" class="rx-window-summary" style="margin-top:4px;"></div>
-    </div>
-
-    <!-- Shared time axis -->
-    <div class="hourly-time-row" id="simTimeRow" style="margin-top:2px;"></div>
-
-    <!-- Timezone normalization notice — shown only when units span multiple zones -->
-    <div id="simTzNote" style="display:none;font-family:var(--mono);font-size:10px;
-      color:var(--amber2);background:rgba(212,120,14,.07);border:1px solid rgba(212,120,14,.2);
-      border-radius:2px;padding:6px 10px;margin-top:8px;"></div>
-
-    <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;">
-      Each row shows today's 24-hour prescription window for that unit. <strong style="color:var(--amber2)">⚡ All Units</strong> shows hours when every unit is simultaneously in prescription.
-    </p>
-    </div><!-- end simWinBody -->
-  </div>
-</div>
-
 <!-- 5-DAY SIMULTANEOUS WINDOW — all units across 5 days -->
 <div id="simWin5d" style="display:none;margin-bottom:20px;">
   <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--amber);border-radius:3px;padding:12px 16px;">
@@ -3683,171 +3638,13 @@ async function detectStateAndRenderLinks(){ renderResourceLinks(); }
 
 
 
-// ═══ SIMULTANEOUS WINDOW (all units in Rx at same time) ══════════════════
-let simStore={};
-let simLoadCount=0;
-function resetSimStore(n){ simStore={}; simLoadCount=0; }
 
 let simStore5d={};
 let simLoad5dCount=0;
 let sim5dSelDay=0;
 function resetSimStore5d(){ simStore5d={}; simLoad5dCount=0; sim5dSelDay=0; }
 
-// updateSimStore — called after each unit's weather loads.
-// cells     = 24-element hourly status array in the unit's LOCAL time
-// utcOffset = integer hours offset from UTC for this unit's timezone (e.g. -5 for ET, -6 for CT)
-function updateSimStore(unitIdx, cells, utcOffset){
-  // Default to local browser offset if not supplied
-  const tz = (utcOffset !== undefined && utcOffset !== null)
-    ? utcOffset
-    : -(new Date().getTimezoneOffset() / 60);
-  simStore[unitIdx] = { cells, tz };
-  simLoadCount++;
-  if(simLoadCount>=units.length) renderSimWindow();
-}
 
-function toggleSimWin(){
-  const body = document.getElementById('simWinBody');
-  const chevron = document.getElementById('simWinChevron');
-  if(!body) return;
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  chevron.textContent = open ? '▶ Show' : '▲ Hide';
-}
-
-function renderSimWindow(){
-  const sec = document.getElementById('simWin');
-  if(!sec || units.length < 1) return;
-  sec.style.display = 'block';
-
-  // ── Timezone normalization ────────────────────────────────────────────────
-  // All bars are in each unit's local time. For multi-timezone sets, we shift
-  // every bar to the EASTERNMOST timezone present (most negative UTC offset =
-  // earliest clock time) so the intersection row represents a single shared
-  // reference clock. This matches NWS practice: when operating across TZ
-  // boundaries, times are stated in the easternmost zone involved.
-  //
-  // Example: ET unit (UTC-5) + CT unit (UTC-6).
-  // CT is 1 hour west → CT hour 10 = ET hour 11.
-  // We shift the CT bar 1 step right so that column 10 on both bars means "10 ET".
-  const offsets = Object.values(simStore).map(e => e.tz);
-  const refTz   = Math.min(...offsets);           // most-negative = easternmost
-  const multiTz = new Set(offsets).size > 1;
-  const nowH    = new Date().getHours();          // browser local — used for ▼ marker
-
-  // shift(cells, fromTz) — rotate 24-cell array to reference timezone.
-  // A unit that is 1 hour WEST (one more negative) needs its bar shifted
-  // RIGHT by 1 position (hour 0 local = hour 1 in the eastern reference).
-  function shiftCells(cells, fromTz){
-    const delta = Math.round(refTz - fromTz); // hours to shift right (positive = west)
-    if(delta === 0) return cells;
-    // Shift right by delta: pad with 'nodata' at the start
-    const shifted = Array(24).fill('nodata');
-    for(let h = 0; h < 24; h++){
-      const dest = h + delta;
-      if(dest >= 0 && dest < 24) shifted[dest] = cells[h];
-    }
-    return shifted;
-  }
-
-  // Build normalized entries preserving unit order
-  const entries = Object.entries(simStore)
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([idx, entry]) => ({
-      idx: Number(idx),
-      cells: shiftCells(entry.cells, entry.tz),
-      tz: entry.tz,
-    }));
-
-  // ── Per-unit stacked bars ─────────────────────────────────────────────────
-  const simRows = document.getElementById('simRows');
-  if(simRows){
-    simRows.innerHTML = entries.map(({ idx, cells, tz }) => {
-      const unit      = units[idx];
-      const name      = unit ? unit.name : 'Unit ' + idx;
-      const shortName = name.length > 18 ? name.slice(0, 17) + '…' : name;
-      const tzDelta   = Math.round(tz - refTz);           // hours west of reference
-      const tzBadge   = (multiTz && tzDelta !== 0)
-        ? ' <span style="font-size:9px;opacity:.6;font-family:var(--mono)">UTC' + (tz >= 0 ? '+' : '') + tz + '</span>'
-        : '';
-
-      const barHtml = cells.map((s, h) =>
-        '<div class="hcell ' + s + (h === nowH ? ' now' : '') +
-        '" title="' + fmtH(h) + ': ' + s + '"></div>'
-      ).join('');
-
-      return '<div class="sim-row">'
-        + '<div class="sim-row-label" title="' + name + '">' + shortName + tzBadge + '</div>'
-        + '<div class="hourly-bar">' + barHtml + '</div>'
-        + '</div>';
-    }).join('');
-  }
-
-  // ── Intersection bar ──────────────────────────────────────────────────────
-  const simCells = Array(24).fill(null).map((_, h) => {
-    const statuses = entries.map(e => e.cells[h] || 'nodata');
-    if(statuses.every(s => s === 'in'))                     return 'in';
-    if(statuses.some(s => s === 'nodata'))                  return 'nodata';
-    if(statuses.every(s => s === 'in' || s === 'marginal'))  return 'marginal';
-    return 'out';
-  });
-
-  const bar = document.getElementById('simBar');
-  if(bar){
-    bar.innerHTML = simCells.map((s, h) =>
-      '<div class="hcell ' + s + (h === nowH ? ' now' : '') + (h === 12 ? ' noon-mark' : '') +
-      '" title="' + fmtH(h) + ': ' + s + '"></div>'
-    ).join('');
-  }
-
-  // ── Window summary text ───────────────────────────────────────────────────
-  const inH = simCells.filter(s => s === 'in').length;
-  const wins = [];
-  let st = null;
-  for(let h = 0; h < 24; h++){
-    if(simCells[h] === 'in' && st === null) st = h;
-    if(simCells[h] !== 'in' && st !== null){ wins.push({s: st, e: h - 1}); st = null; }
-  }
-  if(st !== null) wins.push({s: st, e: 23});
-  const winText = wins.map(w => fmtH(w.s) + '–' + fmtH(w.e)).join(', ');
-
-  const lbl = document.getElementById('simLbl');
-  if(lbl){
-    if(inH === 0)
-      lbl.innerHTML = '<span style="color:var(--out)">No simultaneous window today</span>';
-    else
-      lbl.innerHTML = '<span class="rxws-window">' + winText + ' (' + inH + 'h)</span>';
-  }
-
-  // ── Timezone normalization notice ─────────────────────────────────────────
-  const tzNote = document.getElementById('simTzNote');
-  if(tzNote){
-    if(multiTz){
-      // Describe the reference timezone by name (best-effort from Intl API)
-      let refTzName = 'UTC' + (refTz >= 0 ? '+' : '') + refTz;
-      try{
-        // Find the unit whose offset matches the reference
-        const refEntry = entries.find(e => e.tz === refTz);
-        const refUnit  = refEntry ? units[refEntry.idx] : null;
-        if(refUnit){
-          const sample = new Date();
-          // Use the unit's lat/lon to get tz name via Intl if we can
-          refTzName = Intl.DateTimeFormat('en-US', { timeZoneName:'short' })
-            .formatToParts(sample).find(p => p.type === 'timeZoneName')?.value || refTzName;
-          // Annotate with which unit sets the reference
-          refTzName += ' (' + refUnit.name + ')';
-        }
-      }catch(e){}
-      tzNote.innerHTML = '🕐 <strong>Times normalized to easternmost timezone.</strong> '
-        + 'Units span multiple time zones — all bars have been shifted to a shared '
-        + refTzName + ' reference clock so the ⚡ All Units row is comparable. '
-        + 'Individual card windows still show each unit\'s own local time.';
-      tzNote.style.display = '';
-    } else {
-      tzNote.style.display = 'none';
-    }
-  }
-}
 
 // ═══ 5-DAY SIMULTANEOUS WINDOW ════════════════════════════════════════════
 
@@ -10261,8 +10058,7 @@ function refreshUnitRx(idx){
     if(fcsEl) fcsEl.innerHTML = daysHtml;
   }
 
-  // ── Sim window + summary bar ───────────────────────────────────────────────
-  updateSimStore(idx, cells, wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
+  // ── Sim window ────────────────────────────────────────────────────────────
   updateSimStore5d(idx, wx, rx, wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
   // Update wxStore with refreshed rx so clickable days use new prescription
   // Preserve chainState from the original fetch — refreshUnitRx never re-fetches it
@@ -10273,7 +10069,6 @@ function renderUnits(){
   const grid=document.getElementById('unitsGrid');
   grid.innerHTML='';
   const summaries=[];
-  resetSimStore(units.length);
   resetSimStore5d();
 
   units.forEach((unit,i)=>{
@@ -10443,7 +10238,6 @@ function renderUnits(){
       }
       // VI badge removed — Ventilation Index already shown in conditions grid cell
 
-      updateSimStore(i, cells, wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
       updateSimStore5d(i, wx, getRxForUnit(unit), wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
 
       // Window text
@@ -11313,22 +11107,17 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 
 
-// ── Init simultaneous window time axes ───────────────────────────────────
-// simBar / sim5dBar are filled dynamically; only the shared time axes need
-// to be built up-front since fmtH() is available at this point.
+// ── Init 5-day window time axis ───────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function(){
-  const timeAxisHtml = Array.from({length: 24}, (_, h) => {
-    const isLabel = [0, 6, 12, 18].includes(h);
-    const isNoon  = h === 12;
-    return '<div class="htime' + (isLabel ? ' label' : '') + (isNoon ? ' noon-mark' : '') + '">'
-         + (isLabel ? fmtH(h) : '') + '</div>';
-  }).join('');
-
-  const simTimeRow = document.getElementById('simTimeRow');
-  if(simTimeRow) simTimeRow.innerHTML = timeAxisHtml;
-
   const sim5dTimeRow = document.getElementById('sim5dTimeRow');
-  if(sim5dTimeRow) sim5dTimeRow.innerHTML = timeAxisHtml;
+  if(sim5dTimeRow){
+    sim5dTimeRow.innerHTML = Array.from({length: 24}, (_, h) => {
+      const isLabel = [0, 6, 12, 18].includes(h);
+      const isNoon  = h === 12;
+      return '<div class="htime' + (isLabel ? ' label' : '') + (isNoon ? ' noon-mark' : '') + '">'
+           + (isLabel ? fmtH(h) : '') + '</div>';
+    }).join('');
+  }
 });
 
 // ── Set print timestamp on card footers ──────────────────────────────────
