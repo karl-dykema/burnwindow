@@ -798,6 +798,24 @@ body::before {
   padding-right: 4px;
 }
 
+/* ═══ 5-DAY ALL-UNITS OUTLOOK ════════════════════════════════════════════ */
+.sim5d-strip {
+  display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.sim5d-tab {
+  font-family: var(--mono); font-size: 11px; padding: 5px 10px;
+  border-radius: 3px; border: 1px solid var(--border2);
+  background: var(--panel2); color: var(--muted); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-width: 52px; transition: border-color .15s, color .15s;
+}
+.sim5d-tab:hover { border-color: var(--amber); color: var(--fg); }
+.sim5d-tab.selected { border-color: var(--amber); color: var(--amber); background: rgba(212,120,14,.08); }
+.sim5d-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+.sim5d-tab-dot.in       { background: rgba(94,184,94,.85); }
+.sim5d-tab-dot.marginal { background: rgba(200,148,32,.85); }
+.sim5d-tab-dot.out      { background: rgba(201,64,48,.65); }
+
 /* ═══ MAP ════════════════════════════════════════════════════════════════ */
 #bwMap .leaflet-container { background: #1a1509; }
 .map-legend {
@@ -1449,6 +1467,54 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
       Each row shows today's 24-hour prescription window for that unit. <strong style="color:var(--amber2)">⚡ All Units</strong> shows hours when every unit is simultaneously in prescription.
     </p>
     </div><!-- end simWinBody -->
+  </div>
+</div>
+
+<!-- 5-DAY SIMULTANEOUS WINDOW — all units across 5 days -->
+<div id="simWin5d" style="display:none;margin-bottom:20px;">
+  <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--amber);border-radius:3px;padding:12px 16px;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;flex-wrap:wrap;gap:6px;cursor:pointer;" onclick="toggleSimWin5d()">
+      <span style="font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--amber)">⚡ 5-Day Window — All Units — click to expand</span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="hourly-legend">
+          <div class="hl-item"><div class="hl-dot in"></div>In Rx</div>
+          <div class="hl-item"><div class="hl-dot marginal"></div>Marginal</div>
+          <div class="hl-item"><div class="hl-dot out"></div>Out</div>
+        </div>
+        <span id="simWin5dChevron" style="font-family:var(--mono);font-size:11px;color:var(--muted);">▶ Show</span>
+      </div>
+    </div>
+
+    <!-- Collapsible body -->
+    <div id="simWin5dBody" style="display:none;margin-top:12px;">
+
+      <!-- Day selector strip -->
+      <div class="sim5d-strip" id="sim5dStrip"></div>
+
+      <!-- Per-unit stacked bars — populated by renderSimWindow5d() -->
+      <div id="sim5dRows"></div>
+
+      <!-- Shared intersection row -->
+      <div style="margin-top:6px;padding-top:8px;border-top:1px solid var(--border);">
+        <div class="sim-row-label" style="color:var(--amber2);font-weight:600;">⚡ All Units</div>
+        <div class="hourly-bar" id="sim5dBar"></div>
+        <div id="sim5dLbl" class="rx-window-summary" style="margin-top:4px;"></div>
+      </div>
+
+      <!-- Shared time axis -->
+      <div class="hourly-time-row" id="sim5dTimeRow" style="margin-top:2px;"></div>
+
+      <!-- Timezone normalization notice -->
+      <div id="sim5dTzNote" style="display:none;font-family:var(--mono);font-size:10px;
+        color:var(--amber2);background:rgba(212,120,14,.07);border:1px solid rgba(212,120,14,.2);
+        border-radius:2px;padding:6px 10px;margin-top:8px;"></div>
+
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;">
+        Select a day above to view hourly windows. <strong style="color:var(--amber2)">⚡ All Units</strong> shows hours when every unit is simultaneously in prescription. Dots show each day's simultaneous window status.
+      </p>
+    </div><!-- end simWin5dBody -->
   </div>
 </div>
 
@@ -3622,6 +3688,11 @@ let simStore={};
 let simLoadCount=0;
 function resetSimStore(n){ simStore={}; simLoadCount=0; }
 
+let simStore5d={};
+let simLoad5dCount=0;
+let sim5dSelDay=0;
+function resetSimStore5d(){ simStore5d={}; simLoad5dCount=0; sim5dSelDay=0; }
+
 // updateSimStore — called after each unit's weather loads.
 // cells     = 24-element hourly status array in the unit's LOCAL time
 // utcOffset = integer hours offset from UTC for this unit's timezone (e.g. -5 for ET, -6 for CT)
@@ -3774,6 +3845,198 @@ function renderSimWindow(){
       tzNote.style.display = '';
     } else {
       tzNote.style.display = 'none';
+    }
+  }
+}
+
+// ═══ 5-DAY SIMULTANEOUS WINDOW ════════════════════════════════════════════
+
+function updateSimStore5d(unitIdx, wx, rx, utcOffset){
+  const tz = (utcOffset !== undefined && utcOffset !== null)
+    ? utcOffset
+    : -(new Date().getTimezoneOffset() / 60);
+  simStore5d[unitIdx] = { wx, rx, tz };
+  simLoad5dCount++;
+  if(simLoad5dCount >= units.length) renderSimWindow5d(sim5dSelDay);
+}
+
+function toggleSimWin5d(){
+  const body    = document.getElementById('simWin5dBody');
+  const chevron = document.getElementById('simWin5dChevron');
+  if(!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chevron.textContent = open ? '▶ Show' : '▲ Hide';
+}
+
+function renderSimWindow5d(dayOffset){
+  const sec = document.getElementById('simWin5d');
+  if(!sec || units.length < 1) return;
+  sec.style.display = 'block';
+  sim5dSelDay = dayOffset;
+
+  // ── Build 5 date strings from today ──────────────────────────────────────
+  const _n = new Date();
+  const dates = Array.from({length:5}, (_, i) => {
+    const d = new Date(_n);
+    d.setDate(d.getDate() + i);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  });
+  const dn5 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // ── Timezone normalization (same logic as simWin) ─────────────────────────
+  const offsets5 = Object.values(simStore5d).map(e => e.tz);
+  const refTz5   = Math.min(...offsets5);
+  const multiTz5 = new Set(offsets5).size > 1;
+  const nowH5    = new Date().getHours();
+
+  function shift5(cells, fromTz){
+    const delta = Math.round(refTz5 - fromTz);
+    if(delta === 0) return cells;
+    const shifted = Array(24).fill('nodata');
+    for(let h = 0; h < 24; h++){
+      const dest = h + delta;
+      if(dest >= 0 && dest < 24) shifted[dest] = cells[h];
+    }
+    return shifted;
+  }
+
+  // ── Build 24-cell array for one unit on one date ──────────────────────────
+  function buildDayCells5(wx, rx, dateStr){
+    const times = wx.hourly.time;
+    const {temperature_2m:T, wind_speed_10m:W, wind_gusts_10m:G,
+           wind_direction_10m:WD, relative_humidity_2m:RH, precipitation_probability:P} = wx.hourly;
+    const cells = [];
+    for(let h = 0; h < 24; h++){
+      const tStr = dateStr + 'T' + (h < 10 ? '0' + h : h) + ':00';
+      const idx  = times.indexOf(tStr);
+      if(idx < 0){ cells.push('nodata'); continue; }
+      cells.push(evalHour(RH[idx], W[idx], G?.[idx]??null, WD[idx], T[idx], P[idx], rx, null));
+    }
+    return cells;
+  }
+
+  // ── Intersection across all units for a given date ────────────────────────
+  function dayIntersection5(dateStr){
+    const cols = Object.entries(simStore5d)
+      .sort((a,b) => Number(a[0]) - Number(b[0]))
+      .map(([, entry]) => shift5(buildDayCells5(entry.wx, entry.rx, dateStr), entry.tz));
+    return Array(24).fill(null).map((_, h) => {
+      const ss = cols.map(c => c[h] || 'nodata');
+      if(ss.every(s => s === 'in'))                     return 'in';
+      if(ss.some(s => s === 'nodata'))                  return 'nodata';
+      if(ss.every(s => s === 'in' || s === 'marginal')) return 'marginal';
+      return 'out';
+    });
+  }
+
+  // Summarize intersection as a single dot status
+  function daySummary5(cells){
+    if(cells.some(s => s === 'in'))       return 'in';
+    if(cells.some(s => s === 'marginal')) return 'marginal';
+    return 'out';
+  }
+
+  // Pre-compute all 5-day intersections (needed for strip dots + selected detail)
+  const allIntersections5 = dates.map(d => dayIntersection5(d));
+
+  // ── Day selector strip ────────────────────────────────────────────────────
+  const strip = document.getElementById('sim5dStrip');
+  if(strip){
+    strip.innerHTML = dates.map((dateStr, fi) => {
+      const dname   = fi === 0 ? 'Today' : dn5[new Date(dateStr + 'T12:00:00').getDay()];
+      const summary = daySummary5(allIntersections5[fi]);
+      const inHrs   = allIntersections5[fi].filter(s => s === 'in').length;
+      const badge   = inHrs > 0 ? inHrs + 'h'
+                    : allIntersections5[fi].some(s => s === 'marginal') ? '~' : '—';
+      return '<button class="sim5d-tab' + (fi === dayOffset ? ' selected' : '') + '" '
+        + 'onclick="renderSimWindow5d(' + fi + ')" title="' + dateStr + '">'
+        + '<span>' + dname + '</span>'
+        + '<div class="sim5d-tab-dot ' + summary + '"></div>'
+        + '<span style="font-size:10px;opacity:.7">' + badge + '</span>'
+        + '</button>';
+    }).join('');
+  }
+
+  // ── Per-unit stacked rows for selected day ────────────────────────────────
+  const entries5 = Object.entries(simStore5d)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([idx, entry]) => ({
+      idx:   Number(idx),
+      cells: shift5(buildDayCells5(entry.wx, entry.rx, dates[dayOffset]), entry.tz),
+      tz:    entry.tz,
+    }));
+
+  const sim5dRows = document.getElementById('sim5dRows');
+  if(sim5dRows){
+    const isToday5 = dayOffset === 0;
+    sim5dRows.innerHTML = entries5.map(({ idx, cells, tz }) => {
+      const unit      = units[idx];
+      const name      = unit ? unit.name : 'Unit ' + idx;
+      const shortName = name.length > 18 ? name.slice(0, 17) + '…' : name;
+      const tzDelta   = Math.round(tz - refTz5);
+      const tzBadge   = (multiTz5 && tzDelta !== 0)
+        ? ' <span style="font-size:9px;opacity:.6;font-family:var(--mono)">UTC' + (tz >= 0 ? '+' : '') + tz + '</span>'
+        : '';
+      const barHtml = cells.map((s, h) =>
+        '<div class="hcell ' + s
+        + (isToday5 && h === nowH5 ? ' now' : '')
+        + (h === 12 ? ' noon-mark' : '')
+        + '" title="' + fmtH(h) + ': ' + s + '"></div>'
+      ).join('');
+      return '<div class="sim-row">'
+        + '<div class="sim-row-label" title="' + name + '">' + shortName + tzBadge + '</div>'
+        + '<div class="hourly-bar">' + barHtml + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── Intersection bar for selected day ─────────────────────────────────────
+  const simCells5  = allIntersections5[dayOffset];
+  const isToday5d  = dayOffset === 0;
+  const bar5 = document.getElementById('sim5dBar');
+  if(bar5){
+    bar5.innerHTML = simCells5.map((s, h) =>
+      '<div class="hcell ' + s
+      + (isToday5d && h === nowH5 ? ' now' : '')
+      + (h === 12 ? ' noon-mark' : '')
+      + '" title="' + fmtH(h) + ': ' + s + '"></div>'
+    ).join('');
+  }
+
+  // ── Window summary text ───────────────────────────────────────────────────
+  const inH5 = simCells5.filter(s => s === 'in').length;
+  const wins5 = []; let st5 = null;
+  for(let h = 0; h < 24; h++){
+    if(simCells5[h] === 'in' && st5 === null) st5 = h;
+    if(simCells5[h] !== 'in' && st5 !== null){ wins5.push({s: st5, e: h - 1}); st5 = null; }
+  }
+  if(st5 !== null) wins5.push({s: st5, e: 23});
+  const winText5 = wins5.map(w => fmtH(w.s) + '–' + fmtH(w.e)).join(', ');
+
+  const lbl5 = document.getElementById('sim5dLbl');
+  if(lbl5){
+    if(inH5 === 0)
+      lbl5.innerHTML = '<span style="color:var(--out)">No simultaneous window on this day</span>';
+    else
+      lbl5.innerHTML = '<span class="rxws-window">' + winText5 + ' (' + inH5 + 'h)</span>';
+  }
+
+  // ── Timezone notice ───────────────────────────────────────────────────────
+  const tzNote5 = document.getElementById('sim5dTzNote');
+  if(tzNote5){
+    if(multiTz5){
+      let refTzName5 = 'UTC' + (refTz5 >= 0 ? '+' : '') + refTz5;
+      try{
+        const refEntry5 = Object.entries(simStore5d).find(([, e]) => e.tz === refTz5);
+        const refUnit5  = refEntry5 ? units[Number(refEntry5[0])] : null;
+        if(refUnit5) refTzName5 += ' (' + refUnit5.name + ')';
+      }catch(e){}
+      tzNote5.innerHTML = '🕐 <strong>Times normalized to easternmost timezone.</strong> '
+        + 'Units span multiple time zones — all bars shifted to ' + refTzName5 + ' reference.';
+      tzNote5.style.display = '';
+    } else {
+      tzNote5.style.display = 'none';
     }
   }
 }
@@ -10000,6 +10263,7 @@ function refreshUnitRx(idx){
 
   // ── Sim window + summary bar ───────────────────────────────────────────────
   updateSimStore(idx, cells, wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
+  updateSimStore5d(idx, wx, rx, wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
   // Update wxStore with refreshed rx so clickable days use new prescription
   // Preserve chainState from the original fetch — refreshUnitRx never re-fetches it
   wxStore[idx] = {wx, rx, alerts, chainState: stored.chainState};
@@ -10010,6 +10274,7 @@ function renderUnits(){
   grid.innerHTML='';
   const summaries=[];
   resetSimStore(units.length);
+  resetSimStore5d();
 
   units.forEach((unit,i)=>{
     const card=document.createElement('div');
@@ -10179,6 +10444,7 @@ function renderUnits(){
       // VI badge removed — Ventilation Index already shown in conditions grid cell
 
       updateSimStore(i, cells, wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
+      updateSimStore5d(i, wx, getRxForUnit(unit), wx.utc_offset_seconds != null ? wx.utc_offset_seconds / 3600 : null);
 
       // Window text
       const rxws=document.getElementById('rxws'+i);
@@ -11047,21 +11313,22 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 
 
-// ── Init simultaneous window time axis ───────────────────────────────────
-// simBar is filled dynamically by renderSimWindow(); only the shared time
-// axis needs to be built up-front since fmtH() is available at this point.
+// ── Init simultaneous window time axes ───────────────────────────────────
+// simBar / sim5dBar are filled dynamically; only the shared time axes need
+// to be built up-front since fmtH() is available at this point.
 window.addEventListener('DOMContentLoaded', function(){
-  const simTimeRow = document.getElementById('simTimeRow');
+  const timeAxisHtml = Array.from({length: 24}, (_, h) => {
+    const isLabel = [0, 6, 12, 18].includes(h);
+    const isNoon  = h === 12;
+    return '<div class="htime' + (isLabel ? ' label' : '') + (isNoon ? ' noon-mark' : '') + '">'
+         + (isLabel ? fmtH(h) : '') + '</div>';
+  }).join('');
 
-  // Hour labels at midnight, 6am, noon, 6pm
-  if(simTimeRow){
-    simTimeRow.innerHTML = Array.from({length: 24}, (_, h) => {
-      const isLabel = [0, 6, 12, 18].includes(h);
-      const isNoon  = h === 12;
-      return '<div class="htime' + (isLabel ? ' label' : '') + (isNoon ? ' noon-mark' : '') + '">'
-           + (isLabel ? fmtH(h) : '') + '</div>';
-    }).join('');
-  }
+  const simTimeRow = document.getElementById('simTimeRow');
+  if(simTimeRow) simTimeRow.innerHTML = timeAxisHtml;
+
+  const sim5dTimeRow = document.getElementById('sim5dTimeRow');
+  if(sim5dTimeRow) sim5dTimeRow.innerHTML = timeAxisHtml;
 });
 
 // ── Set print timestamp on card footers ──────────────────────────────────
