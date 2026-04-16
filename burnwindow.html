@@ -826,6 +826,8 @@ body::before {
 }
 .map-leg-item { display: flex; align-items: center; gap: 7px; color: var(--text); }
 .map-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.map-leg-bbox { width: 14px; height: 0; border-top: 2px dashed rgba(212,120,14,.7); flex-shrink: 0; }
+.bw-map-tip { font-family: var(--mono) !important; font-size: 11px !important; }
 
 /* ═══ CLICKABLE FORECAST DAYS ════════════════════════════════════════════ */
 .fcday {
@@ -1362,7 +1364,10 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
 <div class="rx-panel">
   <div class="rx-header">
     <div><div class="rx-title">🌐 Global Default Prescription</div><div class="rx-override-warn" id="rxOverrideWarn" style="display:none">⚠ MODIFIED — units without a saved value for a field will use these overridden values</div></div>
-    <button class="tbar-btn primary" onclick="resetRx()">↺ Reset to Defaults</button>
+    <div style="display:flex;gap:6px;">
+      <button class="tbar-btn primary" id="rxSaveBtn" onclick="saveGlobalRx()">💾 Save</button>
+      <button class="tbar-btn" onclick="resetRx()">↺ Reset</button>
+    </div>
   </div>
   <div class="rx-grid">
     <div class="rx-field"><label>RH Min</label><div class="irow"><input class="rx-input" id="rxRhMin" type="number" value="25" oninput="onGlobalRxChange()"><span class="rx-unit">%</span></div></div>
@@ -1408,6 +1413,7 @@ body.mobile-view .uc-foot-right .fc-sbtn { flex: 1 1 auto; text-align: center; p
     <div class="map-legend">
       <div class="map-leg-item"><span class="map-leg-dot" style="background:#d4780e"></span>Burn Unit</div>
       <div class="map-leg-item"><span class="map-leg-dot" style="background:#c94030"></span>Active Fire</div>
+      <div class="map-leg-item"><span class="map-leg-bbox"></span>Detection Area</div>
     </div>
   </div>
   <!-- NIFC debug status — shows count and age of loaded incident data -->
@@ -1901,6 +1907,8 @@ function resetRx(){
     const on=['N','NE','S','SW','W','NW'].includes(el.dataset.d);
     el.classList.toggle('on',on);
   });
+  try{ localStorage.removeItem(GRX_KEY); }catch(e){}
+  onGlobalRxChange();
 }
 
 function toggleRxDrawer(){
@@ -2878,6 +2886,57 @@ function unitUsesGlobalField(unit){
     ||rx.tempMin==null||rx.precipMax==null||!rx.dirs||!rx.dirs.length;
 }
 
+const GRX_KEY = 'bw_globalrx_v1';
+
+function saveGlobalRx(){
+  try{
+    const dirs = [...document.querySelectorAll('#rxDirRow .dir-chip.on')].map(el=>el.dataset.d);
+    const data = {
+      rhMin:    document.getElementById('rxRhMin').value,
+      rhMax:    document.getElementById('rxRhMax').value,
+      windMin:  document.getElementById('rxWindMin').value,
+      windMax:  document.getElementById('rxWindMax').value,
+      tempMin:  document.getElementById('rxTempMin').value,
+      precipMax:document.getElementById('rxPrecipMax').value,
+      ffmcMax:  document.getElementById('rxFfmcMax').value,
+      isiMax:   document.getElementById('rxIsiMax').value,
+      buiMax:   document.getElementById('rxBuiMax').value,
+      fwiMax:   document.getElementById('rxFwiMax').value,
+      gustMax:  document.getElementById('rxGustMax').value,
+      kbdiMax:  document.getElementById('rxKbdiMax').value,
+      dirs,
+    };
+    localStorage.setItem(GRX_KEY, JSON.stringify(data));
+    // Brief "Saved" feedback on button
+    const btn = document.getElementById('rxSaveBtn');
+    if(btn){ btn.textContent='✓ Saved'; setTimeout(()=>{ btn.textContent='💾 Save'; }, 1500); }
+  }catch(e){}
+}
+
+function loadGlobalRx(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(GRX_KEY)||'null');
+    if(!saved) return;
+    if(saved.rhMin    != null) document.getElementById('rxRhMin').value     = saved.rhMin;
+    if(saved.rhMax    != null) document.getElementById('rxRhMax').value     = saved.rhMax;
+    if(saved.windMin  != null) document.getElementById('rxWindMin').value   = saved.windMin;
+    if(saved.windMax  != null) document.getElementById('rxWindMax').value   = saved.windMax;
+    if(saved.tempMin  != null) document.getElementById('rxTempMin').value   = saved.tempMin;
+    if(saved.precipMax!= null) document.getElementById('rxPrecipMax').value = saved.precipMax;
+    if(saved.ffmcMax  != null) document.getElementById('rxFfmcMax').value   = saved.ffmcMax;
+    if(saved.isiMax   != null) document.getElementById('rxIsiMax').value    = saved.isiMax;
+    if(saved.buiMax   != null) document.getElementById('rxBuiMax').value    = saved.buiMax;
+    if(saved.fwiMax   != null) document.getElementById('rxFwiMax').value    = saved.fwiMax;
+    if(saved.gustMax  != null) document.getElementById('rxGustMax').value   = saved.gustMax;
+    if(saved.kbdiMax  != null) document.getElementById('rxKbdiMax').value   = saved.kbdiMax;
+    if(saved.dirs){
+      document.querySelectorAll('#rxDirRow .dir-chip').forEach(el=>{
+        el.classList.toggle('on', saved.dirs.includes(el.dataset.d));
+      });
+    }
+  }catch(e){}
+}
+
 function onGlobalRxChange(){
   const modified=isGlobalModified();
   // Update warning in panel
@@ -3397,7 +3456,7 @@ async function checkNearbyFires(unitIdx, lat, lon){
 }
 
 // ═══ LEAFLET MAP ══════════════════════════════════════════════════════════
-let map=null, mapMarkers=[], fireMarkers=[];
+let map=null, mapMarkers=[], fireMarkers=[], bboxLayer=null;
 let mapShown=false;
 
 function toggleMap(){
@@ -3431,6 +3490,8 @@ function initMap(){
   // invalidateSize after tiles have had a moment to load — critical on iOS
   setTimeout(function(){ map.invalidateSize(); }, 200);
   updateMapUnits();
+  // Re-apply fire markers — fires were fetched during page load before map existed
+  fetchNIFCFires().then(function(fires){ updateMapFires(fires); }).catch(function(){});
 }
 
 function updateMapUnits(){
@@ -3455,6 +3516,29 @@ function updateMapUnits(){
     bounds.push([unit.lat,unit.lon]);
   });
   if(bounds.length) map.fitBounds(bounds,{padding:[40,40],maxZoom:12});
+  updateMapBbox();
+}
+
+function updateMapBbox(){
+  if(!map) return;
+  if(bboxLayer){ bboxLayer.remove(); bboxLayer=null; }
+  if(!units.length) return;
+  // Compute bbox from all unit centroids padded by NIFC_RADIUS_KM
+  const R_LAT = NIFC_RADIUS_KM / 111;
+  let minLat=Infinity, maxLat=-Infinity, minLon=Infinity, maxLon=-Infinity;
+  units.forEach(unit=>{
+    const R_LON = NIFC_RADIUS_KM / (111 * Math.cos(unit.lat * Math.PI / 180));
+    minLat=Math.min(minLat, unit.lat - R_LAT);
+    maxLat=Math.max(maxLat, unit.lat + R_LAT);
+    minLon=Math.min(minLon, unit.lon - R_LON);
+    maxLon=Math.max(maxLon, unit.lon + R_LON);
+  });
+  bboxLayer = L.rectangle([[minLat,minLon],[maxLat,maxLon]],{
+    color:'rgba(212,120,14,.6)', weight:1.5, dashArray:'5 5', fill:false, interactive:false
+  }).addTo(map);
+  bboxLayer.bindTooltip('Fire detection area (' + NIFC_RADIUS_KM + 'km radius)',{
+    permanent:false, direction:'top', className:'bw-map-tip'
+  });
 }
 
 function updateMapFires(fires){
@@ -11345,6 +11429,7 @@ function toggleDaylight(){
 })();
 
 
+loadGlobalRx();
 renderUnits();
 detectStateAndRenderLinks();
 // Update map markers after units render (slight delay for status colors)
