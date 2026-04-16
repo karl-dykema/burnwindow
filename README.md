@@ -1,5 +1,5 @@
 # 🔥 BurnWindow
-**Prescribed Fire Decision Dashboard** · v1.0.0
+**Prescribed Fire Decision Dashboard** · v1.0.1
 
 BurnWindow is an open-source, browser-based go/no-go decision support tool for prescribed fire managers. It integrates real-time weather forecasts, the Canadian Fire Weather Index (FWI) system, CFFDRS Fire Behavior Prediction (FBP), drought indices, air quality, and nearby active fire detection into a single field-ready dashboard — with no server, no login, and no installation required.
 
@@ -21,6 +21,7 @@ BurnWindow is an open-source, browser-based go/no-go decision support tool for p
 - **Nearby active fires** — NIFC incident detection with distance and acreage; wildfires and nearby prescribed burns (RX) shown separately; each incident links directly to its location in [Watch Duty](https://app.watchduty.org)
 - **Station observations** — current weather from the nearest station, fetched in priority order: (1) Synoptic Data RAWS (free token optional — provides actual fire-weather stations); (2) NWS weather.gov ASOS airport observations (no key required, automatic fallback); (3) Open-Meteo forecast model as last resort. Observations outside the 10 AM–4 PM window revert to model values to maintain FWI accuracy.
 - **5-day forecast** — clickable forecast strip updates all FWI and FBP outputs for each forecast day
+- **5-day all-units window** — collapsible panel showing simultaneous prescription windows across all units for the full week; day-selector strip with colored status dots and hour counts; click any day to view hourly stacked bars and the intersection row
 - **Go/No-Go modal** — structured decision checklist with burn log
 - **CSV import/export** — bulk unit management
 - **State resource links** — quick access to state forestry, DNR, and fire permitting contacts
